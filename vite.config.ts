@@ -7,23 +7,7 @@ export default defineConfig({
     outDir: 'dist',
     emptyOutDir: true,
     target: 'esnext',
-    sourcemap: true,
-    rollupOptions: {
-      output: {
-        manualChunks(id) {
-          if (id.includes('node_modules')) {
-            if (id.includes('firebase')) {
-              return 'vendor-firebase';
-            }
-            if (id.includes('@material') || id.includes('lit')) {
-              return 'vendor-ui';
-            }
-            return 'vendor-others';
-          }
-          return undefined;
-        }
-      }
-    }
+    sourcemap: true
   },
   server: {
     port: 5173,
