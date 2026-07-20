@@ -1,8 +1,59 @@
-bower_components/
-build/
+# Dependency Directories
 node_modules/
-*.lock
-functions/package-lock.json
-functions/*.lock
+jspm_packages/
+web_modules/
+
+# Build and Compilation Outputs
+dist/
+build/
+out/
+.tsc-cache/
+
+# Local Environment Variables & Secrets
+.env
+.env.local
+.env.development.local
+.env.test.local
+.env.production.local
+*.env.json
+
+# IDE / Editor Settings
+.vscode/
+.idea/
+*.suo
+*.ntvs*
+*.njsproj
+*.sln
+*.swp
+*.swo
+
+# Diagnostic and Log Files
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+lerna-debug.log*
+logs/
+*.log
+
+# OS Metadata Files
 .DS_Store
-npm-debug.log
+.DS_Store?
+._*
+Thumbs.db
+ehthumbs.db
+
+# Firebase CLI cache and logs
+.firebase/
+firebase-debug.log
+
+# Testing and Coverage
+coverage/
+.nyc_output/
+.vitest/
+
+# Playwright, MCP and Automation Artifacts
+.playwright-mcp/
+playwright-report/
+test-results/
+test-failures/
