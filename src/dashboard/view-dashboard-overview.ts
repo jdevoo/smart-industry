@@ -38,6 +38,49 @@ export class ViewDashboardOverview extends LitElement {
       color: #744210;
       margin-bottom: 16px;
     }
+    .setup-checklist {
+      list-style-type: none;
+      padding: 0;
+      margin: 16px auto;
+      max-width: 480px;
+      text-align: left;
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+    }
+    .setup-checklist li {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      font-size: 0.95rem;
+      padding: 6px 12px;
+      border-radius: 6px;
+    }
+    .setup-checklist li.checked {
+      background-color: rgba(46, 125, 50, 0.08);
+      color: #2e7d32;
+    }
+    .setup-checklist li.pending {
+      background-color: rgba(245, 124, 0, 0.08);
+      color: #e65100;
+    }
+    .material-symbols-outlined {
+      font-family: 'Material Symbols Outlined';
+      font-weight: normal;
+      font-style: normal;
+      font-size: 24px;
+      line-height: 1;
+      letter-spacing: normal;
+      text-transform: none;
+      display: inline-block;
+      white-space: nowrap;
+      word-wrap: normal;
+      direction: ltr;
+      -webkit-font-smoothing: antialiased;
+    }
+    .setup-checklist md-icon {
+      font-size: 20px;
+    }
 
     /* KPI Grid layout */
     .kpi-grid {
@@ -119,8 +162,32 @@ export class ViewDashboardOverview extends LitElement {
     this.authState.profile?.key ? `/data/${this.authState.profile.key}/performanceData` : null
   );
 
+  private productsController = new FirebaseQueryController(this, () =>
+    this.authState.profile?.key ? `/data/${this.authState.profile.key}/factoryData/product` : null
+  );
+
   override updated() {
     this.calculateRemainOpTime();
+    this.checkAutoSetupComplete();
+  }
+
+  private async checkAutoSetupComplete() {
+    const profile = this.authState.profile;
+    const uid = this.authState.user?.uid;
+    if (!profile || !uid || profile.setup) return;
+
+    const hasMachines = this.machinesController.data.length > 0;
+    const hasStations = this.stationsController.data.length > 0;
+    const hasProducts = this.productsController.data.length > 0;
+    const hasOperation = this.operationController.data && this.operationController.data.production_model;
+
+    if (hasMachines && hasStations && hasProducts && hasOperation) {
+      try {
+        await update(dbRef(db, `/user/${uid}`), { setup: true });
+      } catch (err) {
+        console.error('Error auto-updating setup status', err);
+      }
+    }
   }
 
   private calculateRemainOpTime() {
@@ -183,7 +250,7 @@ export class ViewDashboardOverview extends LitElement {
   }
 
   override render() {
-    if (this.ordersController.loading || this.machinesController.loading || this.stationsController.loading) {
+    if (this.ordersController.loading || this.machinesController.loading || this.stationsController.loading || this.productsController.loading) {
       return html`<p>Loading operational dashboard metrics...</p>`;
     }
 
@@ -195,13 +262,46 @@ export class ViewDashboardOverview extends LitElement {
     const oee = this.performanceController.data?.oee || 95; // default to 95 if not loaded as shown in original
     const sched = this.scheduleController.data;
 
+    const hasMachines = this.machinesController.data.length > 0;
+    const hasStations = this.stationsController.data.length > 0;
+    const hasProducts = this.productsController.data.length > 0;
+    const hasOperation = this.operationController.data && this.operationController.data.production_model;
+
     return html`
       <!-- New User Checklist Alert -->
       ${!this.authState.profile?.setup ? html`
         <div class="setup-warning-card">
-          <h4 class="warning-title">Are you a new user?</h4>
-          <p class="warning-text">It looks like your factory hasn't been completely set up. Please head to the Factory Setup page to register machinery and lines.</p>
-          <md-filled-button @click=${() => window.location.href = '/app/setup'}>Go to Setup</md-filled-button>
+          <h4 class="warning-title">Configure your Factory Layout</h4>
+          <p class="warning-text">Before you can book sales orders or run production schedules, your factory topology must be configured. Please complete the following checklist:</p>
+          
+          <ul class="setup-checklist">
+            <li class="${hasMachines ? 'checked' : 'pending'}">
+              <span class="material-symbols-outlined" style="font-size: 18px; margin-right: 4px;">
+                ${hasMachines ? 'check_circle' : 'pending'}
+              </span>
+              Register your Machinery (${this.machinesController.data.length} registered)
+            </li>
+            <li class="${hasStations ? 'checked' : 'pending'}">
+              <span class="material-symbols-outlined" style="font-size: 18px; margin-right: 4px;">
+                ${hasStations ? 'check_circle' : 'pending'}
+              </span>
+              Configure assembly Work Stations (${this.stationsController.data.length} configured)
+            </li>
+            <li class="${hasProducts ? 'checked' : 'pending'}">
+              <span class="material-symbols-outlined" style="font-size: 18px; margin-right: 4px;">
+                ${hasProducts ? 'check_circle' : 'pending'}
+              </span>
+              Define your Products & Part sequences (${this.productsController.data.length} defined)
+            </li>
+            <li class="${hasOperation ? 'checked' : 'pending'}">
+              <span class="material-symbols-outlined" style="font-size: 18px; margin-right: 4px;">
+                ${hasOperation ? 'check_circle' : 'pending'}
+              </span>
+              Set your Factory Operating Shifts and Flow Model
+            </li>
+          </ul>
+
+          <md-filled-button style="margin-top: 8px;" @click=${() => window.location.href = '/app/setup'}>Go to Setup Workspace</md-filled-button>
         </div>
       ` : ''}
 
