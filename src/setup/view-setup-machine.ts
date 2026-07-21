@@ -18,7 +18,7 @@ interface MachineItem {
   description: string;
   name: string;
   number: number;
-  speed: number;
+  capacity: string;
   state: boolean;
 }
 
@@ -168,7 +168,7 @@ export class ViewSetupMachine extends LitElement {
   // Editor fields
   @state() private editName = '';
   @state() private editNumber = 1;
-  @state() private editSpeed = 1;
+  @state() private editCapacity = '100';
   @state() private editDescription = '';
   @state() private editState = true;
 
@@ -183,7 +183,7 @@ export class ViewSetupMachine extends LitElement {
     // Suggest next numerical identifier based on current machines length
     const currentMax = this.machinesController.data.reduce((max, item) => item.number > max ? item.number : max, 0);
     this.editNumber = currentMax + 1;
-    this.editSpeed = 1.0;
+    this.editCapacity = '100';
     this.editDescription = '';
     this.editState = true;
     this.showEditor = true;
@@ -193,7 +193,7 @@ export class ViewSetupMachine extends LitElement {
     this.editingKey = machine.$key;
     this.editName = machine.name || '';
     this.editNumber = machine.number || 1;
-    this.editSpeed = machine.speed || 1.0;
+    this.editCapacity = (machine.capacity !== undefined ? machine.capacity : '100').toString();
     this.editDescription = machine.description || '';
     this.editState = machine.state !== undefined ? machine.state : true;
     this.showEditor = true;
@@ -224,7 +224,7 @@ export class ViewSetupMachine extends LitElement {
     const payload = {
       name: this.editName,
       number: Number(this.editNumber),
-      speed: Number(this.editSpeed),
+      capacity: this.editCapacity,
       description: this.editDescription,
       state: this.editState
     };
@@ -281,7 +281,7 @@ export class ViewSetupMachine extends LitElement {
                 <p class="machine-description">${machine.description || 'No asset description provided.'}</p>
 
                 <div class="machine-specs">
-                  <div><strong>Speed Rating:</strong> ${machine.speed}x</div>
+                  <div><strong>Max Capacity:</strong> ${machine.capacity || 'N/A'} items/hr</div>
                 </div>
 
                 <div class="machine-actions">
@@ -320,11 +320,10 @@ export class ViewSetupMachine extends LitElement {
               </md-outlined-text-field>
 
               <md-outlined-text-field 
-                label="Speed Efficiency Multiplier" 
+                label="Max Capacity (items/hour)" 
                 type="number" 
-                step="0.1"
-                .value=${this.editSpeed.toString()}
-                @input=${(e: any) => this.editSpeed = Number(e.target.value)}>
+                .value=${this.editCapacity}
+                @input=${(e: any) => this.editCapacity = e.target.value}>
               </md-outlined-text-field>
 
               <md-outlined-text-field 

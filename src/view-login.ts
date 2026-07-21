@@ -106,6 +106,9 @@ export class ViewLogin extends LitElement {
       color: #2e7d32;
       border: 1px solid #c3e6cb;
     }
+    form {
+      display: contents;
+    }
   `;
 
   @state() private currentForm: 'login' | 'register' | 'reset' = 'login';
@@ -118,6 +121,21 @@ export class ViewLogin extends LitElement {
   @state() private password = '';
   @state() private company = '';
   @state() private phone = '';
+
+  private _handleLoginSubmit(e: Event) {
+    e.preventDefault();
+    this.login();
+  }
+
+  private _handleRegisterSubmit(e: Event) {
+    e.preventDefault();
+    this.register();
+  }
+
+  private _handleResetSubmit(e: Event) {
+    e.preventDefault();
+    this.resetPassword();
+  }
 
   private async login() {
     this.clearAlerts();
@@ -242,101 +260,107 @@ export class ViewLogin extends LitElement {
 
   private renderLoginForm() {
     return html`
-      <div class="form-title">
-        <h2>User Login</h2>
-      </div>
-      <div class="form-group">
-        <md-outlined-text-field
-          label="Email address"
-          type="email"
-          .value=${this.email}
-          @input=${(e: any) => this.email = e.target.value}
-          required>
-        </md-outlined-text-field>
-        <md-outlined-text-field
-          label="Password"
-          type="password"
-          .value=${this.password}
-          @input=${(e: any) => this.password = e.target.value}
-          required>
-        </md-outlined-text-field>
-      </div>
-      <div class="checkbox-container">
-        <md-checkbox
-          id="keepSession"
-          ?checked=${this.remember}
-          @change=${(e: any) => this.remember = e.target.checked}>
-        </md-checkbox>
-        <label for="keepSession">Keep me signed in</label>
-      </div>
-      <md-filled-button class="btn-block" @click=${this.login}>Login</md-filled-button>
-      <div class="links-container">
-        <a href="#" @click=${(e: Event) => { e.preventDefault(); this.currentForm = 'reset'; this.clearAlerts(); }}>Forgot?</a>
-        <a href="#" @click=${(e: Event) => { e.preventDefault(); this.currentForm = 'register'; this.clearAlerts(); }}>Don’t have an account? Sign up now.</a>
-      </div>
+      <form @submit=${this._handleLoginSubmit}>
+        <div class="form-title">
+          <h2>User Login</h2>
+        </div>
+        <div class="form-group">
+          <md-outlined-text-field
+            label="Email address"
+            type="email"
+            .value=${this.email}
+            @input=${(e: any) => this.email = e.target.value}
+            required>
+          </md-outlined-text-field>
+          <md-outlined-text-field
+            label="Password"
+            type="password"
+            .value=${this.password}
+            @input=${(e: any) => this.password = e.target.value}
+            required>
+          </md-outlined-text-field>
+        </div>
+        <div class="checkbox-container">
+          <md-checkbox
+            id="keepSession"
+            ?checked=${this.remember}
+            @change=${(e: any) => this.remember = e.target.checked}>
+          </md-checkbox>
+          <label for="keepSession">Keep me signed in</label>
+        </div>
+        <md-filled-button type="submit" class="btn-block">Login</md-filled-button>
+        <div class="links-container">
+          <a href="#" @click=${(e: Event) => { e.preventDefault(); this.currentForm = 'reset'; this.clearAlerts(); }}>Forgot?</a>
+          <a href="#" @click=${(e: Event) => { e.preventDefault(); this.currentForm = 'register'; this.clearAlerts(); }}>Don’t have an account? Sign up now.</a>
+        </div>
+      </form>
     `;
   }
 
   private renderRegisterForm() {
     return html`
-      <div class="form-title">
-        <h2>Register Company</h2>
-      </div>
-      <div class="form-group">
-        <md-outlined-text-field
-          label="Email address"
-          type="email"
-          .value=${this.email}
-          @input=${(e: any) => this.email = e.target.value}
-          required>
-        </md-outlined-text-field>
-        <md-outlined-text-field
-          label="New password"
-          type="password"
-          .value=${this.password}
-          @input=${(e: any) => this.password = e.target.value}
-          required>
-        </md-outlined-text-field>
-        <md-outlined-text-field
-          label="Company name"
-          .value=${this.company}
-          @input=${(e: any) => this.company = e.target.value}
-          required>
-        </md-outlined-text-field>
-        <md-outlined-text-field
-          label="Phone (+XX XXXX XXXX X)"
-          type="tel"
-          .value=${this.phone}
-          @input=${(e: any) => this.phone = e.target.value}
-          required>
-        </md-outlined-text-field>
-      </div>
-      <md-filled-button class="btn-block" @click=${this.register}>Register and Login</md-filled-button>
-      <div class="links-container">
-        <a href="#" @click=${(e: Event) => { e.preventDefault(); this.currentForm = 'login'; this.clearAlerts(); }}>Already have an account? Log in</a>
-      </div>
+      <form @submit=${this._handleRegisterSubmit}>
+        <div class="form-title">
+          <h2>Register Company</h2>
+        </div>
+        <div class="form-group">
+          <md-outlined-text-field
+            label="Email address"
+            type="email"
+            .value=${this.email}
+            @input=${(e: any) => this.email = e.target.value}
+            required>
+          </md-outlined-text-field>
+          <md-outlined-text-field
+            label="New password"
+            type="password"
+            .value=${this.password}
+            @input=${(e: any) => this.password = e.target.value}
+            required>
+          </md-outlined-text-field>
+          <md-outlined-text-field
+            label="Company name"
+            .value=${this.company}
+            @input=${(e: any) => this.company = e.target.value}
+            required>
+          </md-outlined-text-field>
+          <md-outlined-text-field
+            label="Phone (+XX XXXX XXXX X)"
+            type="tel"
+            .value=${this.phone}
+            @input=${(e: any) => this.phone = e.target.value}
+            required>
+          </md-outlined-text-field>
+        </div>
+        <md-filled-button type="submit" class="btn-block">Register and Login</md-filled-button>
+        <div class="links-container">
+          <a href="#" @click=${(e: Event) => { e.preventDefault(); this.currentForm = 'login'; this.clearAlerts(); }}>Already have an account? Log in</a>
+        </div>
+      </form>
     `;
   }
 
   private renderResetForm() {
     return html`
-      <div class="form-title">
-        <h2>Reset your password</h2>
-        <p>Enter the email you used to signup with and we'll send you a link to reset your password.</p>
-      </div>
-      <div class="form-group">
-        <md-outlined-text-field
-          label="Email address"
-          type="email"
-          .value=${this.email}
-          @input=${(e: any) => this.email = e.target.value}
-          required>
-        </md-outlined-text-field>
-      </div>
-      <md-filled-button class="btn-block" @click=${this.resetPassword}>Reset Password</md-filled-button>
-      <div class="links-container">
-        <a href="#" @click=${(e: Event) => { e.preventDefault(); this.currentForm = 'login'; this.clearAlerts(); }}>Return to login</a>
-      </div>
+      <form @submit=${this._handleResetSubmit}>
+        <div class="form-title">
+          <h2>Reset your password</h2>
+          <p>Enter the email you used to signup with and we'll send you a link to reset your password.</p>
+        </div>
+        <div class="form-group">
+          <md-outlined-text-field
+            label="Email address"
+            type="email"
+            .value=${this.email}
+            @input=${(e: any) => this.email = e.target.value}
+            required>
+          </md-outlined-text-field>
+        </div>
+        <md-filled-button type="submit" class="btn-block">Reset Password</md-filled-button>
+        <div class="links-container">
+          <a href="#" @click=${(e: Event) => { e.preventDefault(); this.currentForm = 'login'; this.clearAlerts(); }}>Return to login</a>
+        </div>
+      </form>
     `;
   }
 }

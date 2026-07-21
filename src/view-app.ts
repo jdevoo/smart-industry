@@ -445,7 +445,7 @@ export class ViewApp extends LitElement {
           <div class="drawer-logo-container">
             <img class="drawer-logo" src="/images/logo/logo.svg" alt="IMES Logo"/>
             <h1 class="drawer-title">IMES</h1>
-            <p class="drawer-subtitle">Your Industry Helper</p>
+            <p class="drawer-subtitle">Your Production Helper</p>
           </div>
 
           <nav>
