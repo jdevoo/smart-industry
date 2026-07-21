@@ -122,6 +122,25 @@ export class ViewSettings extends LitElement {
   private authState!: UserContextValue;
 
   @state() private showKeychainDialog = false;
+
+  private _boundEscHandler = this._handleEscKey.bind(this);
+
+  override connectedCallback() {
+    super.connectedCallback();
+    window.addEventListener('keydown', this._boundEscHandler);
+  }
+
+  override disconnectedCallback() {
+    window.removeEventListener('keydown', this._boundEscHandler);
+    super.disconnectedCallback();
+  }
+
+  private _handleEscKey(e: KeyboardEvent) {
+    if (e.key === 'Escape' && this.showKeychainDialog) {
+      this.showKeychainDialog = false;
+    }
+  }
+
   @state() private newKeychainKey = '';
 
   // Input states for form targets

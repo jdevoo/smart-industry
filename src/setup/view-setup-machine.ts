@@ -172,6 +172,24 @@ export class ViewSetupMachine extends LitElement {
   @state() private editDescription = '';
   @state() private editState = true;
 
+  private _boundEscHandler = this._handleEscKey.bind(this);
+
+  override connectedCallback() {
+    super.connectedCallback();
+    window.addEventListener('keydown', this._boundEscHandler);
+  }
+
+  override disconnectedCallback() {
+    window.removeEventListener('keydown', this._boundEscHandler);
+    super.disconnectedCallback();
+  }
+
+  private _handleEscKey(e: KeyboardEvent) {
+    if (e.key === 'Escape' && this.showEditor) {
+      this.showEditor = false;
+    }
+  }
+
   // Real-time machines list controller
   private machinesController = new FirebaseQueryController<MachineItem>(this, () =>
     this.authState.profile?.key ? `/data/${this.authState.profile.key}/factoryData/machine` : null

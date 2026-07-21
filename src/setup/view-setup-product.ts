@@ -233,6 +233,24 @@ export class ViewSetupProduct extends LitElement {
   // Editor Child Parts list
   @state() private editParts: ProductPart[] = [];
 
+  private _boundEscHandler = this._handleEscKey.bind(this);
+
+  override connectedCallback() {
+    super.connectedCallback();
+    window.addEventListener('keydown', this._boundEscHandler);
+  }
+
+  override disconnectedCallback() {
+    window.removeEventListener('keydown', this._boundEscHandler);
+    super.disconnectedCallback();
+  }
+
+  private _handleEscKey(e: KeyboardEvent) {
+    if (e.key === 'Escape' && this.showEditor) {
+      this.showEditor = false;
+    }
+  }
+
   // Controllers
   private productsController = new FirebaseQueryController<ProductItem>(this, () =>
     this.authState.profile?.key ? `/data/${this.authState.profile.key}/factoryData/product` : null

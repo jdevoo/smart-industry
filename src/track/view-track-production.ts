@@ -274,6 +274,29 @@ export class ViewTrackProduction extends LitElement {
   @state() private reportingGoodCount = 0;
   @state() private reportingDefectCount = 0;
 
+  private _boundEscHandler = this._handleEscKey.bind(this);
+
+  override connectedCallback() {
+    super.connectedCallback();
+    window.addEventListener('keydown', this._boundEscHandler);
+  }
+
+  override disconnectedCallback() {
+    window.removeEventListener('keydown', this._boundEscHandler);
+    super.disconnectedCallback();
+  }
+
+  private _handleEscKey(e: KeyboardEvent) {
+    if (e.key === 'Escape') {
+      if (this.showAddDeviceDialog) {
+        this.showAddDeviceDialog = false;
+      }
+      if (this.activeJobReportingKey) {
+        this.activeJobReportingKey = null;
+      }
+    }
+  }
+
   // Queries
   private jobsQueryController = new FirebaseQueryController<WIPJobItem>(this, () =>
     this.authState.profile?.key ? `/data/${this.authState.profile.key}/trackingData` : null

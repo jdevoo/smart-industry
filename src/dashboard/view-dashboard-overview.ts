@@ -166,9 +166,37 @@ export class ViewDashboardOverview extends LitElement {
     this.authState.profile?.key ? `/data/${this.authState.profile.key}/factoryData/product` : null
   );
 
+  private _isResettingInterval = false;
+
   override updated() {
     this.calculateRemainOpTime();
     this.checkAutoSetupComplete();
+    this.checkIntervalAndReset();
+  }
+
+  private checkIntervalAndReset() {
+    const sched = this.scheduleController.data;
+    const companyKey = this.authState.profile?.key;
+    if (!sched || !companyKey || !sched.interval || !sched.start_interval) return;
+
+    const current = Math.floor(Date.now() / 1000);
+    const diff = current - sched.start_interval;
+    const range = sched.interval * 24 * 60 * 60;
+
+    if (diff > range) {
+      if (this._isResettingInterval) return;
+      this._isResettingInterval = true;
+      update(dbRef(db, `/data/${companyKey}/factoryData/schedule`), {
+        start_interval: current
+      })
+      .then(() => {
+        this._isResettingInterval = false;
+      })
+      .catch(err => {
+        console.error('Auto-interval reset error', err);
+        this._isResettingInterval = false;
+      });
+    }
   }
 
   private async checkAutoSetupComplete() {
@@ -229,24 +257,9 @@ export class ViewDashboardOverview extends LitElement {
 
   private getNextIntervalStr(last_timestamp: number, intervalDays: number): string {
     if (!last_timestamp || !intervalDays) return 'N/A';
-    const current = Math.floor(Date.now() / 1000);
-    const diff = current - last_timestamp;
     const range = intervalDays * 24 * 60 * 60;
-
-    if (diff <= range) {
-      const nextIntervalTimeStamp = (last_timestamp + range) * 1000;
-      return displayDateFromTimestamp(nextIntervalTimeStamp);
-    } else {
-      // Auto-reschedule timer threshold crossed, automatically update database interval anchor
-      const companyKey = this.authState.profile?.key;
-      if (companyKey) {
-        update(dbRef(db, `/data/${companyKey}/factoryData/schedule`), {
-          start_interval: current
-        }).catch(err => console.error('Auto-interval reset error', err));
-      }
-      const nextIntervalTimeStamp = (current + range) * 1000;
-      return displayDateFromTimestamp(nextIntervalTimeStamp);
-    }
+    const nextIntervalTimeStamp = (last_timestamp + range) * 1000;
+    return displayDateFromTimestamp(nextIntervalTimeStamp);
   }
 
   override render() {

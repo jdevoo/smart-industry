@@ -233,6 +233,24 @@ export class ViewSetupStation extends LitElement {
   @state() private draftMachines: SimpleMachineInfo[] = [];
   @state() private selectedMachineKeyToAssign = '';
 
+  private _boundEscHandler = this._handleEscKey.bind(this);
+
+  override connectedCallback() {
+    super.connectedCallback();
+    window.addEventListener('keydown', this._boundEscHandler);
+  }
+
+  override disconnectedCallback() {
+    window.removeEventListener('keydown', this._boundEscHandler);
+    super.disconnectedCallback();
+  }
+
+  private _handleEscKey(e: KeyboardEvent) {
+    if (e.key === 'Escape' && this.showEditor) {
+      this.showEditor = false;
+    }
+  }
+
   // Controllers
   private stationsController = new FirebaseQueryController<StationItem>(this, () =>
     this.authState.profile?.key ? `/data/${this.authState.profile.key}/factoryData/station` : null

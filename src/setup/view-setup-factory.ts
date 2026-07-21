@@ -114,6 +114,8 @@ export class ViewSetupFactory extends LitElement {
   @state() private interval = 1; // reschedule interval in days
   @state() private delay = 10; // WIP delay between stations in minutes
 
+  private hasInitializedData = false;
+
   // Subscriptions to factory database nodes
   private profileController = new FirebaseDocController(this, () => 
     this.authState.profile?.key ? `/data/${this.authState.profile.key}/factoryData/profile` : null
@@ -132,16 +134,21 @@ export class ViewSetupFactory extends LitElement {
   );
 
   override updated() {
-    // Sync UI fields when firebase data resolved
-    if (this.profileController.data && !this.profileController.loading) {
+    // Only initialize the local working copy when the data has first loaded, to prevent infinite re-rendering loops
+    if (this.hasInitializedData) return;
+
+    const profileLoaded = this.profileController.data && !this.profileController.loading;
+    const operationLoaded = this.operationController.data && !this.operationController.loading;
+    const performanceLoaded = this.performanceController.data && !this.performanceController.loading;
+    const scheduleLoaded = this.scheduleController.data && !this.scheduleController.loading;
+
+    if (profileLoaded && operationLoaded && performanceLoaded && scheduleLoaded) {
       const p = this.profileController.data;
       if (p.name !== undefined) this.factoryName = p.name;
       if (p.type !== undefined) this.factoryType = p.type;
       if (p.model !== undefined) this.model = p.model;
       if (p.concurrency !== undefined) this.concurrency = parseInt(p.concurrency) || 2;
-    }
 
-    if (this.operationController.data && !this.operationController.loading) {
       const op = this.operationController.data;
       if (op.op_start !== undefined) this.op_start = op.op_start;
       if (op.op_end !== undefined) this.op_end = op.op_end;
@@ -157,20 +164,18 @@ export class ViewSetupFactory extends LitElement {
         });
         this.opDays = newDays;
       }
-    }
 
-    if (this.performanceController.data && !this.performanceController.loading) {
       const perf = this.performanceController.data;
       if (perf.optimize !== undefined) this.optimize = perf.optimize;
       if (perf.au !== undefined) this.au = parseInt(perf.au) || 85;
       if (perf.meff !== undefined) this.meff = parseInt(perf.meff) || 75;
       if (perf.aw !== undefined) this.aw = parseFloat(perf.aw) || 0.02;
-    }
 
-    if (this.scheduleController.data && !this.scheduleController.loading) {
       const sched = this.scheduleController.data;
       if (sched.interval !== undefined) this.interval = parseInt(sched.interval) || 1;
       if (sched.delay !== undefined) this.delay = parseInt(sched.delay) || 10;
+
+      this.hasInitializedData = true;
     }
   }
 
