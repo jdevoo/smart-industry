@@ -79,7 +79,7 @@ Job-shop environments feature diverse product configurations where different par
 ## 🛠 Developer Guide
 
 ### Prerequisites
-*   **NodeJS:** Version `>= 18.x`
+*   **NodeJS:** Version `>= 22.x`
 *   **npm:** Version `>= 9.x`
 
 ### Local Installation
