@@ -436,9 +436,6 @@ export class ViewSetupStation extends LitElement {
                     .value=${this.selectedMachineKeyToAssign}
                     style="flex: 1"
                     @change=${(e: any) => this.selectedMachineKeyToAssign = e.target.value}>
-                    <md-select-option value="">
-                      <div slot="headline">-- Select Active Asset --</div>
-                    </md-select-option>
                     ${availableMachines.map(m => html`
                       <md-select-option value=${m.$key}>
                         <div slot="headline">#${m.number} - ${m.name}</div>
