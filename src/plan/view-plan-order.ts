@@ -391,9 +391,6 @@ export class ViewPlanOrder extends LitElement {
               label="Select Customer" 
               .value=${this.selectedCustomerKey}
               @change=${(e: any) => this.selectedCustomerKey = e.target.value}>
-              <md-select-option value="">
-                <div slot="headline">-- Select Client --</div>
-              </md-select-option>
               ${customers.map(c => html`
                 <md-select-option value=${c.$key}>
                   <div slot="headline">${c.name}</div>
@@ -405,9 +402,6 @@ export class ViewPlanOrder extends LitElement {
               label="Select Product SKU" 
               .value=${this.selectedProductKey}
               @change=${(e: any) => this.selectedProductKey = e.target.value}>
-              <md-select-option value="">
-                <div slot="headline">-- Select Product SKU --</div>
-              </md-select-option>
               ${products.map(p => html`
                 <md-select-option value=${p.$key}>
                   <div slot="headline">${p.name} (SKU: ${p.sku})</div>
