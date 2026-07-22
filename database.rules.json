@@ -1,0 +1,25 @@
+{
+  "rules": {
+    // By default, do not allow any reading or writing to the root of the database
+    ".read": false,
+    ".write": false,
+
+    "user": {
+      "$uid": {
+        // Users can only read and write their own profile details
+        ".read": "auth != null && auth.uid === $uid",
+        ".write": "auth != null && auth.uid === $uid"
+      }
+    },
+
+    "data": {
+      "$companyKey": {
+        // Tenant-isolated database rules:
+        // A user can only read or write to factory data if their user profile has been associated 
+        // with this companyKey (profile.key).
+        ".read": "auth != null && root.child('user').child(auth.uid).child('key').val() === $companyKey",
+        ".write": "auth != null && root.child('user').child(auth.uid).child('key').val() === $companyKey"
+      }
+    }
+  }
+}
