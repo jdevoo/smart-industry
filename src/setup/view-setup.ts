@@ -6,6 +6,8 @@ import './view-setup-factory.js';
 import './view-setup-machine.js';
 import './view-setup-station.js';
 import './view-setup-product.js';
+import './view-setup-customer.js';
+import './view-setup-inventory.js';
 
 @customElement('view-setup')
 export class ViewSetup extends LitElement {
@@ -66,7 +68,7 @@ export class ViewSetup extends LitElement {
     }
   `;
 
-  @state() private activeTab: 'factory' | 'machine' | 'station' | 'product' = 'factory';
+  @state() private activeTab: 'factory' | 'machine' | 'station' | 'product' | 'customer' | 'inventory' = 'factory';
 
   override render() {
     return html`
@@ -76,6 +78,8 @@ export class ViewSetup extends LitElement {
           <button class="tab-btn ${this.activeTab === 'machine' ? 'active' : ''}" @click=${() => this.activeTab = 'machine'}>Machines</button>
           <button class="tab-btn ${this.activeTab === 'station' ? 'active' : ''}" @click=${() => this.activeTab = 'station'}>Work Stations</button>
           <button class="tab-btn ${this.activeTab === 'product' ? 'active' : ''}" @click=${() => this.activeTab = 'product'}>Products & Parts</button>
+          <button class="tab-btn ${this.activeTab === 'customer' ? 'active' : ''}" @click=${() => this.activeTab = 'customer'}>Customers</button>
+          <button class="tab-btn ${this.activeTab === 'inventory' ? 'active' : ''}" @click=${() => this.activeTab = 'inventory'}>Inventory</button>
         </div>
 
         <div class="view-outlet">
@@ -83,6 +87,8 @@ export class ViewSetup extends LitElement {
           ${this.activeTab === 'machine' ? html`<view-setup-machine></view-setup-machine>` : ''}
           ${this.activeTab === 'station' ? html`<view-setup-station></view-setup-station>` : ''}
           ${this.activeTab === 'product' ? html`<view-setup-product></view-setup-product>` : ''}
+          ${this.activeTab === 'customer' ? html`<view-setup-customer></view-setup-customer>` : ''}
+          ${this.activeTab === 'inventory' ? html`<view-setup-inventory></view-setup-inventory>` : ''}
         </div>
       </div>
     `;
