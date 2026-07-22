@@ -6,6 +6,7 @@ export class FirebaseDocController<T = any> implements ReactiveController {
   private host: ReactiveControllerHost;
   private path: string | (() => string | null);
   private unsubscribe: (() => void) | null = null;
+  private lastResolvedPath: string | null = null;
   
   data: T | null = null;
   loading = true;
@@ -25,11 +26,19 @@ export class FirebaseDocController<T = any> implements ReactiveController {
     this.unsubscribeFromDb();
   }
 
-  // Allow re-subscribing if path dynamics change (e.g., user uid loads)
+  hostUpdate() {
+    const resolvedPath = typeof this.path === 'function' ? this.path() : this.path;
+    if (resolvedPath !== this.lastResolvedPath) {
+      this.subscribe();
+    }
+  }
+
   subscribe() {
     this.unsubscribeFromDb();
 
     const resolvedPath = typeof this.path === 'function' ? this.path() : this.path;
+    this.lastResolvedPath = resolvedPath;
+
     if (!resolvedPath) {
       this.loading = false;
       this.data = null;

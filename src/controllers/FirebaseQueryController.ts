@@ -19,6 +19,7 @@ export class FirebaseQueryController<T extends FirebaseObjectWithKey = any> impl
   private path: string | (() => string | null);
   private constraints: QueryConstraint[] | (() => QueryConstraint[] | null);
   private unsubscribe: (() => void) | null = null;
+  private lastResolvedPath: string | null = null;
 
   data: T[] = [];
   loading = true;
@@ -43,10 +44,19 @@ export class FirebaseQueryController<T extends FirebaseObjectWithKey = any> impl
     this.unsubscribeFromDb();
   }
 
+  hostUpdate() {
+    const resolvedPath = typeof this.path === 'function' ? this.path() : this.path;
+    if (resolvedPath !== this.lastResolvedPath) {
+      this.subscribe();
+    }
+  }
+
   subscribe() {
     this.unsubscribeFromDb();
 
     const resolvedPath = typeof this.path === 'function' ? this.path() : this.path;
+    this.lastResolvedPath = resolvedPath;
+
     if (!resolvedPath) {
       this.loading = false;
       this.data = [];
