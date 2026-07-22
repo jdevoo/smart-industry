@@ -172,7 +172,14 @@ export class ViewSetupProduct extends LitElement {
     .form-row {
       display: grid;
       grid-template-columns: 1fr 1fr;
-      gap: 12px;
+      gap: 16px;
+      margin-bottom: 16px;
+    }
+    .form-row:last-child {
+      margin-bottom: 0;
+    }
+    .form-group {
+      display: block;
     }
     
     /* Parts Builder Styling */
