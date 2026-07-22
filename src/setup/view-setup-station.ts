@@ -33,7 +33,7 @@ interface MachineItem {
   $key: string;
   name: string;
   number: number;
-  state: boolean;
+  state?: boolean;
 }
 
 @customElement('view-setup-station')
@@ -354,7 +354,7 @@ export class ViewSetupStation extends LitElement {
     }
 
     const stations = this.stationsController.data;
-    const availableMachines = this.machinesController.data.filter(m => m.state); // Only active machinery
+    const availableMachines = this.machinesController.data.filter(m => m.state !== false); // Only active machinery (defaults to true if undefined)
 
     return html`
       <div class="station-workspace">
