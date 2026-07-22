@@ -477,7 +477,7 @@ export class ViewApp extends LitElement {
               <img class="user-avatar" src="${avatarUrl}" alt="Profile Avatar"/>
               <div class="user-details">
                 <p class="user-name">${profile?.displayname || 'User Profile'}</p>
-                <p class="user-version">Version 2.0.0 (Lit)</p>
+                <p class="user-version">Version 2.0.0</p>
               </div>
             </div>
           </div>
