@@ -3,7 +3,7 @@ import { customElement, state, query } from 'lit/decorators.js';
 import { ContextProvider } from '@lit/context';
 import { Router } from '@vaadin/router';
 import { onAuthStateChanged, signOut } from 'firebase/auth';
-import { ref, onValue } from 'firebase/database';
+import { ref, onValue, update } from 'firebase/database';
 import { auth, db } from './config/firebase.js';
 import { userContext, UserContextValue, UserProfile } from './context/userContext.js';
 
@@ -323,6 +323,19 @@ export class ViewApp extends LitElement {
         this.profileUnsubscribe = onValue(userProfileRef, 
           (snapshot) => {
             const profile = snapshot.val() as UserProfile | null;
+            
+            // Sync user data to corporate workspace directory for Manage Users features
+            if (profile && profile.key) {
+              const companyUserRef = ref(db, `/data/${profile.key}/users/${user.uid}`);
+              update(companyUserRef, {
+                uid: user.uid,
+                displayname: profile.displayname || user.displayName || 'Untitled User',
+                email: profile.email || user.email || '',
+                role: profile.role || 'operator',
+                photoURL: profile.photoURL || null
+              }).catch((e) => console.warn('User directory sync bypassed:', e.message));
+            }
+
             this.updateAuthState({
               user,
               profile,
