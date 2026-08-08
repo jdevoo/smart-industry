@@ -4,6 +4,7 @@ import { customElement, state } from 'lit/decorators.js';
 // Subviews (Vite will bundle and code-split these)
 import './view-track-production.js';
 import './view-track-warehouse.js';
+import './view-track-performance.js';
 
 @customElement('view-track')
 export class ViewTrack extends LitElement {
@@ -73,7 +74,7 @@ export class ViewTrack extends LitElement {
     }
   `;
 
-  @state() private activeTab: 'production' | 'warehouse' = 'production';
+  @state() private activeTab: 'production' | 'warehouse' | 'performance' = 'production';
 
   override render() {
     return html`
@@ -85,11 +86,15 @@ export class ViewTrack extends LitElement {
           <button class="tab-btn ${this.activeTab === 'warehouse' ? 'active' : ''}" @click=${() => this.activeTab = 'warehouse'}>
             <md-icon>warehouse</md-icon> Warehouse Inventory
           </button>
+          <button class="tab-btn ${this.activeTab === 'performance' ? 'active' : ''}" @click=${() => this.activeTab = 'performance'}>
+            <md-icon>speed</md-icon> Performance Tracking
+          </button>
         </div>
 
         <div class="view-outlet">
           ${this.activeTab === 'production' ? html`<view-track-production></view-track-production>` : ''}
           ${this.activeTab === 'warehouse' ? html`<view-track-warehouse></view-track-warehouse>` : ''}
+          ${this.activeTab === 'performance' ? html`<view-track-performance></view-track-performance>` : ''}
         </div>
       </div>
     `;
