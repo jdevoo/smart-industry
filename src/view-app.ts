@@ -64,12 +64,7 @@ export class ViewApp extends LitElement {
     aside.collapsed {
       width: 72px;
     }
-    aside.collapsed .drawer-logo {
-      width: 40px;
-      height: 40px;
-    }
-    aside.collapsed .drawer-title,
-    aside.collapsed .drawer-subtitle,
+    aside.collapsed .drawer-brand-container,
     aside.collapsed .nav-text,
     aside.collapsed .user-details,
     aside.collapsed .logout-btn {
@@ -91,33 +86,69 @@ export class ViewApp extends LitElement {
       height: 40px;
     }
 
-    .drawer-logo-container {
+    .drawer-header-row {
+      display: flex;
+      align-items: center;
+      padding: 0 12px; /* Standardize left offset to exactly 12px */
+      border-bottom: 1px solid rgba(0, 0, 0, 0.05);
+      height: 64px;
+      box-sizing: border-box;
+      transition: padding 0.3s;
+      gap: 12px; /* 12px gap to align text start to exactly 72px */
+    }
+    aside.collapsed .drawer-header-row {
+      padding: 0;
+      justify-content: center;
+    }
+    .desktop-toggle-btn {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      background: none;
+      border: none;
+      cursor: pointer;
+      color: #202020;
+      padding: 0;
+      margin: 0;
+      width: 48px;
+      height: 48px;
+      border-radius: 50%;
+      transition: background-color 0.2s, transform 0.1s;
+      flex-shrink: 0;
+    }
+    .desktop-toggle-btn:hover {
+      background-color: rgba(0, 0, 0, 0.04);
+    }
+    .desktop-toggle-btn:active {
+      transform: scale(0.95);
+    }
+    .desktop-toggle-btn md-icon {
+      --md-icon-size: 24px;
+      font-size: 24px;
+      width: 24px;
+      height: 24px;
+    }
+    .drawer-brand-container {
       display: flex;
       flex-direction: column;
-      align-items: center;
-      padding: 24px 16px;
-      border-bottom: 1px solid rgba(0, 0, 0, 0.05);
-      transition: padding 0.3s;
-    }
-    aside.collapsed .drawer-logo-container {
-      padding: 16px 8px;
-    }
-    .drawer-logo {
-      width: 80px;
-      height: 80px;
-      margin-bottom: 12px;
-      transition: width 0.3s, height 0.3s;
+      justify-content: center;
+      transition: opacity 0.3s;
     }
     .drawer-title {
-      font-size: 1.8rem;
+      font-size: 1.25rem;
       font-weight: 500;
       margin: 0;
       color: #202020;
+      white-space: nowrap;
+      line-height: 1.1;
     }
     .drawer-subtitle {
-      font-size: 0.85rem;
+      font-size: 0.72rem;
       color: #777;
-      margin: 4px 0 0 0;
+      margin: 2px 0 0 0;
+      font-weight: 400;
+      white-space: nowrap;
+      line-height: 1.1;
     }
     nav {
       flex: 1;
@@ -217,6 +248,12 @@ export class ViewApp extends LitElement {
       align-items: center;
       padding: 0 24px;
       justify-content: space-between;
+      box-sizing: border-box;
+    }
+    .page-header-left {
+      display: flex;
+      align-items: center;
+      gap: 12px;
     }
     .page-title {
       font-size: 1.25rem;
@@ -234,12 +271,18 @@ export class ViewApp extends LitElement {
       display: none !important;
     }
 
-    /* Mobile handling overlay */
-    .menu-btn {
-      display: inline-block;
+    /* Toggle buttons display styles */
+    .mobile-menu-btn {
+      display: none;
     }
 
     @media (max-width: 768px) {
+      .mobile-menu-btn {
+        display: inline-flex; /* Fix baseline offset of inline-block */
+      }
+      .desktop-toggle-btn {
+        display: none !important;
+      }
       aside {
         position: fixed;
         left: 0;
@@ -247,17 +290,16 @@ export class ViewApp extends LitElement {
         bottom: 0;
         z-index: 100;
         transform: translateX(-100%);
+        width: 260px !important;
+        transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1);
       }
       aside.open {
         transform: translateX(0) !important;
-        width: 260px !important;
       }
-      aside.open .drawer-logo {
-        width: 80px !important;
-        height: 80px !important;
+      aside.collapsed {
+        transform: translateX(-100%) !important;
       }
-      aside.open .drawer-title,
-      aside.open .drawer-subtitle,
+      aside.open .drawer-brand-container,
       aside.open .nav-text,
       aside.open .user-details,
       aside.open .logout-btn {
@@ -302,15 +344,26 @@ export class ViewApp extends LitElement {
 
   private router!: Router;
   private profileUnsubscribe: (() => void) | null = null;
+  private _boundResizeHandler = this._handleResize.bind(this);
 
   override connectedCallback() {
     super.connectedCallback();
+    this.drawerOpen = window.innerWidth > 768;
+    window.addEventListener('resize', this._boundResizeHandler);
     this.initAuth();
   }
 
   override disconnectedCallback() {
+    window.removeEventListener('resize', this._boundResizeHandler);
     super.disconnectedCallback();
     this.cleanupProfileListener();
+  }
+
+  private _handleResize() {
+    const isDesktop = window.innerWidth > 768;
+    if (!isDesktop && this.drawerOpen) {
+      this.drawerOpen = false;
+    }
   }
 
   private initAuth() {
@@ -511,11 +564,15 @@ export class ViewApp extends LitElement {
         <!-- Overlay backdrop for mobile -->
         <div class="backdrop ${this.drawerOpen ? 'open' : ''}" @click=${() => this.drawerOpen = false}></div>
 
-        <aside class="${this.drawerOpen ? '' : 'collapsed'}" ?hidden=${!showLayout}>
-          <div class="drawer-logo-container">
-            <img class="drawer-logo" src="/images/logo/logo.svg" alt="IMES Logo"/>
-            <h1 class="drawer-title">IMES</h1>
-            <p class="drawer-subtitle">Win The Day</p>
+        <aside class="${this.drawerOpen ? 'open' : 'collapsed'}" ?hidden=${!showLayout}>
+          <div class="drawer-header-row">
+            <button class="desktop-toggle-btn" @click=${() => this.drawerOpen = !this.drawerOpen} title="Toggle Drawer">
+              <md-icon>menu</md-icon>
+            </button>
+            <div class="drawer-brand-container">
+              <h1 class="drawer-title">IMES</h1>
+              <p class="drawer-subtitle">Win The Day</p>
+            </div>
           </div>
 
           <nav>
@@ -563,8 +620,8 @@ export class ViewApp extends LitElement {
 
         <main>
           <header ?hidden=${!showLayout}>
-            <div style="display: flex; align-items: center; gap: 12px;">
-              <md-icon-button @click=${() => this.drawerOpen = !this.drawerOpen}>
+            <div class="page-header-left">
+              <md-icon-button class="mobile-menu-btn" @click=${() => this.drawerOpen = !this.drawerOpen}>
                 <md-icon>menu</md-icon>
               </md-icon-button>
               <h2 class="page-title">${this.headerTitle}</h2>
