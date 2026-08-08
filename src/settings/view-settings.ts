@@ -687,7 +687,7 @@ export class ViewSettings extends LitElement {
     const user = this.authState.user;
     const profile = this.authState.profile;
     const appData = this.appDataController.data;
-    const avatarUrl = user?.photoURL || '/images/profile/default.svg';
+    const avatarUrl = user?.photoURL || '/images/profile/icon-512x512.png';
 
     return html`
       <div style="display:flex; flex-direction:column; gap:16px; margin-bottom: 24px;">
@@ -724,7 +724,15 @@ export class ViewSettings extends LitElement {
           <h3 class="card-title">Account Preferences</h3>
           
           <div class="profile-avatar-row">
-            <img class="profile-avatar" src="${avatarUrl}" alt="User Avatar" />
+            <img 
+              class="profile-avatar" 
+              src="${avatarUrl}" 
+              alt="User Avatar"
+              @error=${(e: any) => {
+                if (e.target.src.includes('icon-512x512.png')) {
+                  e.target.src = '/images/profile/any.svg';
+                }
+              }} />
             <div class="avatar-btn-group">
               <md-outlined-button @click=${this.triggerProfileImageUpload}>Change Image</md-outlined-button>
               <md-outlined-button @click=${this.removeProfileImage} ?disabled=${!user?.photoURL}>Remove</md-outlined-button>
@@ -886,7 +894,14 @@ export class ViewSettings extends LitElement {
               ` : this.companyUsers.map(u => html`
                 <div class="user-list-item">
                   <div class="user-item-details">
-                    <img class="user-item-avatar" src="${u.photoURL || '/images/profile/default.svg'}" />
+                    <img 
+                      class="user-item-avatar" 
+                      src="${u.photoURL || '/images/profile/icon-512x512.png'}" 
+                      @error=${(e: any) => {
+                        if (e.target.src.includes('icon-512x512.png')) {
+                          e.target.src = '/images/profile/any.svg';
+                        }
+                      }} />
                     <div class="user-item-info">
                       <span class="user-item-name">${u.displayname} ${u.uid === user?.uid ? '(You)' : ''}</span>
                       <span class="user-item-email">${u.email}</span>

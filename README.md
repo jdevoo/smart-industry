@@ -24,7 +24,7 @@ In 2026, the IMES codebase was fully modernized, moving away from legacy Polymer
 *   **Database & Auth API:** Uses the **Modular Firebase Web JS SDK (v10)**, allowing fine-grained tree-shaking of Realtime Database and Auth modules.
 *   **Live Data Synchronization:** Handled via custom **Lit Reactive Controllers** (`FirebaseDocController` and `FirebaseQueryController`) which bind component lifecycles to Firebase listeners, automatically cleaning up database connections when components unmount.
 *   **User Interface:** Styled using Google's **Material 3 (M3) Web Components** (`@material/web`) and high-density, performant **Vaadin Grids** (`@vaadin/grid`) to fit dense industrial dashboard requirements.
-*   **PWA and Offline Capabilities:** Configured with **Workbox** (via `vite-plugin-pwa`) to support deep offline caching for shopfloor terminals, safeguarding execution data during network disconnects.
+*   **PWA and Offline Capabilities:** Configured with **Workbox** (via `vite-plugin-pwa`) to support deep offline caching for shopfloor terminals, safeguarding execution data during network disconnects. In production builds, the service worker compiles on-the-fly (`sw.js`) and precaches core layouts, fonts, and assets, while being intelligently bypassed in development for seamless Hot Module Replacement (HMR).
 
 ---
 
@@ -39,12 +39,13 @@ In 2026, the IMES codebase was fully modernized, moving away from legacy Polymer
 - [x] Scaffold modern layout navigation, responsive sidebar drawers, and high-fidelity routing.
 - [x] Implement secure registration with automatic fetch-based sample database seeding.
 - [x] Establish a modern, fast Unit Testing suite using Vitest and Happy DOM.
+- [x] Integrate local testing quality indicators with automated V8 test coverage.
 
-### Production Engineering Roadmap & Aspirations
-- [ ] **Dynamic Production Simulator Engine:** Visual timeline mapping (Gantt-based) representing job-shop operational sequences before dispatching to the floor.
-- [ ] **Live Shopfloor Progress Board:** High-density, real-time feedback board matching pending steps against live machine states.
+### Production Engineering Roadmap & Achievements
+- [x] **Dynamic Production Simulator Engine:** Visual timeline mapping (Gantt-based) representing job-shop operational sequences before dispatching to the floor. (Fully functional on the *Plan > Scheduling* Gantt Chart and the animated *Plan > Production* Playback Simulator!)
+- [x] **Live Shopfloor Progress Board:** High-density, real-time feedback board matching pending steps against live machine states. (Fully functional on the *Track > Production* view!)
+- [x] **Telemetry Machine/Sensor Counter Integrations:** Enhance physical IoT tracker couplings to automatically complete shopfloor runs. (Done! Programmed with sensor registers, WebUSB hardware scanning, and real-time pulse triggers!)
 - [ ] **Advanced Scheduling Optimization:** Complete the integration of linear programming (using `javascript-lp-solver`) to compute constraint-bound asset utilization alongside heuristics.
-- [ ] **Telemetry Machine/Sensor Counter Integrations:** Enhance physical IoT tracker couplings to automatically complete shopfloor runs.
 
 ---
 
@@ -109,8 +110,12 @@ This application utilizes a Firebase Realtime Database and Email Authentication 
 | Action | Command | Purpose |
 | :--- | :--- | :--- |
 | **Development** | `npm run dev` | Runs the Vite local server with Hot Module Replacement at `http://localhost:5173`. |
-| **Production Build** | `npm run build` | Runs Typechecking (`tsc`) and compiles minified, chunk-split production static assets inside the `dist/` folder. |
-| **Local Preview** | `npm run preview` | Spins up a local production server to test the performance of the compiled bundle. |
+| **Production Build** | `npm run build` | Runs Typechecking (`tsc`) and compiles minified, chunk-split production static assets inside the `dist/` folder with complete Service Worker precaching. |
+| **Local Preview** | `npm run preview` | Spins up a local production server to test the performance and PWA capabilities of the compiled bundle. |
+| **Run Unit Tests** | `npm run test` | Executes the Vitest assertion suite against core math heuristics, datatypes, and rendering routines. |
+| **Deploy Rules** | `npm run deploy:rules` | Safely updates and deploys the tenant-isolated security rules to your live Firebase Realtime Database. |
+| **Deploy Hosting** | `npm run deploy:hosting` | Deploys the static production assets in the `dist/` folder straight to Firebase Hosting. |
+| **Full Deployment** | `npm run deploy` | Deploys both rules and hosting assets to Firebase in a single command. |
 
 ---
 

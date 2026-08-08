@@ -496,7 +496,7 @@ export class ViewApp extends LitElement {
   override render() {
     const showLayout = this.authState.user !== null && this.activeRoute !== 'login';
     const profile = this.authState.profile;
-    const avatarUrl = profile?.photoURL || '/images/profile/default.svg';
+    const avatarUrl = profile?.photoURL || '/images/profile/icon-512x512.png';
 
     return html`
       <!-- Fixed Loading Screen Overlay -->
@@ -544,7 +544,15 @@ export class ViewApp extends LitElement {
           <div class="drawer-footer">
             <button class="logout-btn" @click=${this.logout}>Log Out</button>
             <div class="user-profile-small">
-              <img class="user-avatar" src="${avatarUrl}" alt="Profile Avatar"/>
+              <img 
+                class="user-avatar" 
+                src="${avatarUrl}" 
+                alt="Profile Avatar"
+                @error=${(e: any) => {
+                  if (e.target.src.includes('icon-512x512.png')) {
+                    e.target.src = '/images/profile/any.svg';
+                  }
+                }} />
               <div class="user-details">
                 <p class="user-name">${profile?.displayname || 'User Profile'}</p>
                 <p class="user-version">Version 2.0.0</p>

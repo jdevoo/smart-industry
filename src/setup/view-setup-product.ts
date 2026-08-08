@@ -35,6 +35,7 @@ interface ProductItem {
   inventory_code: string;
   inventory_use: string;
   part: ProductPart[];
+  image?: string;
 }
 
 interface StationItem {
@@ -123,6 +124,16 @@ export class ViewSetupProduct extends LitElement {
       margin-top: auto;
       border-top: 1px solid rgba(0,0,0,0.05);
       padding-top: 12px;
+    }
+
+    /* Product Thumbnail Icon styling */
+    .product-icon {
+      width: 48px;
+      height: 48px;
+      border-radius: 8px;
+      border: 1px solid rgba(0,0,0,0.08);
+      background-color: #fafafa;
+      object-fit: cover;
     }
 
     /* Advanced Multi-step Dialog Editor */
@@ -236,6 +247,7 @@ export class ViewSetupProduct extends LitElement {
   @state() private editCost = '';
   @state() private editInventoryCode = '';
   @state() private editInventoryUse = '';
+  @state() private editImage = '';
 
   // Editor Child Parts list
   @state() private editParts: ProductPart[] = [];
@@ -276,6 +288,7 @@ export class ViewSetupProduct extends LitElement {
     this.editCost = '';
     this.editInventoryCode = '';
     this.editInventoryUse = '';
+    this.editImage = '';
     this.editParts = [];
     this.showEditor = true;
   }
@@ -289,6 +302,7 @@ export class ViewSetupProduct extends LitElement {
     this.editCost = product.cost || '';
     this.editInventoryCode = product.inventory_code || '';
     this.editInventoryUse = product.inventory_use || '';
+    this.editImage = product.image || '';
     this.editParts = product.part ? JSON.parse(JSON.stringify(product.part)) : [];
     this.showEditor = true;
   }
@@ -319,6 +333,36 @@ export class ViewSetupProduct extends LitElement {
 
   private removePartFromDraft(index: number) {
     this.editParts = this.editParts.filter((_, i) => i !== index);
+  }
+
+  private triggerProductImageUpload() {
+    const fileInput = this.shadowRoot?.getElementById('productImageInput') as HTMLInputElement;
+    fileInput?.click();
+  }
+
+  private handleProductImageChange(e: Event) {
+    const file = (e.target as HTMLInputElement).files?.[0];
+    if (!file) return;
+
+    if (!file.type.match(/image.*/)) {
+      alert('Invalid file format. Please upload an image.');
+      return;
+    }
+
+    if (file.size > 1024 * 1024) { // 1MB limit
+      alert('File size exceeds the 1MB limit.');
+      return;
+    }
+
+    const reader = new FileReader();
+    reader.onload = () => {
+      this.editImage = reader.result as string;
+    };
+    reader.readAsDataURL(file);
+  }
+
+  private removeProductImage() {
+    this.editImage = '';
   }
 
   private addStepToPart(partIndex: number) {
@@ -354,6 +398,7 @@ export class ViewSetupProduct extends LitElement {
       cost: this.editCost,
       inventory_code: this.editInventoryCode,
       inventory_use: this.editInventoryUse,
+      image: this.editImage,
       part: this.editParts
     };
 
@@ -368,6 +413,15 @@ export class ViewSetupProduct extends LitElement {
     } catch (err) {
       console.error('Error saving product configuration', err);
     }
+  }
+
+  private getProductImageSrc(image?: string): string {
+    if (!image) return '/images/product/icon-512x512.png';
+    // Pre-emptively intercept legacy deleted Firebase default assets to bypass network request timeouts
+    if (image.includes('smart-mes.appspot.com') && (image.includes('default%2Fproduct') || image.includes('stock-1.png'))) {
+      return '/images/product/icon-512x512.png';
+    }
+    return image;
   }
 
   override render() {
@@ -395,9 +449,25 @@ export class ViewSetupProduct extends LitElement {
             ${products.map(product => html`
               <div class="product-card" style="border-top: 5px solid ${product.color}">
                 <div class="product-header">
-                  <div>
-                    <h4 class="product-title">${product.name}</h4>
-                    <p class="product-meta">Main SKU: ${product.sku}</p>
+                  <div style="display: flex; gap: 12px; align-items: center;">
+                    <img 
+                      class="product-icon" 
+                      src="${this.getProductImageSrc(product.image)}" 
+                      alt="Product Icon"
+                      @error=${(e: any) => {
+                        const target = e.target;
+                        if (!target.src.includes('icon-512x512.png') && !target.src.includes('any.svg')) {
+                          // 1. Broken custom database image path failed -> fallback to default PNG
+                          target.src = '/images/product/icon-512x512.png';
+                        } else if (target.src.includes('icon-512x512.png')) {
+                          // 2. Default PNG failed -> fallback to default SVG
+                          target.src = '/images/product/any.svg';
+                        }
+                      }} />
+                    <div>
+                      <h4 class="product-title">${product.name}</h4>
+                      <p class="product-meta">Main SKU: ${product.sku}</p>
+                    </div>
                   </div>
                 </div>
 
@@ -451,6 +521,41 @@ export class ViewSetupProduct extends LitElement {
                   <md-outlined-text-field label="Inventory Code" .value=${this.editInventoryCode} @input=${(e: any) => this.editInventoryCode = e.target.value}></md-outlined-text-field>
                   <md-outlined-text-field label="Inventory Use Qty" type="number" .value=${this.editInventoryUse} @input=${(e: any) => this.editInventoryUse = e.target.value}></md-outlined-text-field>
                 </div>
+              </div>
+            </div>
+
+            <!-- Product Icon / Image picker -->
+            <div class="editor-section">
+              <h5 class="section-title">Product Icon / Image</h5>
+              <div style="display: flex; align-items: center; gap: 16px; margin-bottom: 8px;">
+                <img 
+                  class="product-icon" 
+                  style="width: 64px; height: 64px;"
+                  src="${this.getProductImageSrc(this.editImage)}" 
+                  alt="Product Image Preview"
+                  @error=${(e: any) => {
+                    const target = e.target;
+                    if (!target.src.includes('icon-512x512.png') && !target.src.includes('any.svg')) {
+                      // 1. Broken custom database image path failed -> fallback to default PNG
+                      target.src = '/images/product/icon-512x512.png';
+                    } else if (target.src.includes('icon-512x512.png')) {
+                      // 2. Default PNG failed -> fallback to default SVG
+                      target.src = '/images/product/any.svg';
+                    }
+                  }} />
+                <div style="display: flex; flex-direction: column; gap: 8px;">
+                  <div style="display: flex; gap: 8px;">
+                    <md-outlined-button @click=${this.triggerProductImageUpload}>Change Image</md-outlined-button>
+                    <md-outlined-button @click=${this.removeProductImage} ?disabled=${!this.editImage}>Remove</md-outlined-button>
+                  </div>
+                  <span style="font-size:0.75rem; color:#777;">Supports PNG or SVG format, maximum size of 1MB.</span>
+                </div>
+                <input 
+                  type="file" 
+                  id="productImageInput" 
+                  accept="image/*" 
+                  style="display:none;" 
+                  @change=${this.handleProductImageChange} />
               </div>
             </div>
 

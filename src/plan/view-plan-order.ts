@@ -36,6 +36,7 @@ interface ProductItem {
   inventory_code: string;
   inventory_use: string;
   part?: ProductPart[];
+  image?: string;
 }
 
 interface CustomerItem {
