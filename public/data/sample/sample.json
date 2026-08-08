@@ -2276,8 +2276,32 @@
         "add": 1765597510,
         "code": "ml300",
         "cost": 40,
-        "name": "ML-430",
+        "name": "ML-430 Layer Pad",
         "quantity": 500,
+        "update": 1773447889
+      },
+      "-L0CyT5-sc500standard": {
+        "add": 1765597510,
+        "code": "sc500",
+        "cost": 120,
+        "name": "Steel Innerspring Coil (5ft)",
+        "quantity": 150,
+        "update": 1773447889
+      },
+      "-L0CyT6-pf220polyfoam": {
+        "add": 1765597510,
+        "code": "pf220",
+        "cost": 15.5,
+        "name": "High-Density Poly Foam (Yds)",
+        "quantity": 25,
+        "update": 1773447889
+      },
+      "-L0CyT7-cf800cottonfb": {
+        "add": 1765597510,
+        "code": "cf800",
+        "cost": 85,
+        "name": "Organic Cotton Fabric (Rolls)",
+        "quantity": 0,
         "update": 1773447889
       }
     },

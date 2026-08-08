@@ -137,6 +137,7 @@ export class ViewSetupInventory extends LitElement {
     .detail-row {
       display: flex;
       justify-content: space-between;
+      align-items: flex-end;
     }
     .detail-label {
       color: #666;
