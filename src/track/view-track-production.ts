@@ -27,8 +27,8 @@ interface WIPJobItem {
   job_sku: string;
   job_quantity: number;
   job_status: 'waiting' | 'wip' | 'done';
-  job_machine: number[];
-  job_station: number[];
+  job_machine: number | number[];
+  job_station: number | number[];
   job_sensor?: string;
   job_good: number;
   job_defect: number;
@@ -529,7 +529,12 @@ export class ViewTrackProduction extends LitElement {
     }
 
     const stations = this.stationsQueryController.data;
-    const activeJobs = this.jobsQueryController.data.filter(j => j.job_station[0] === this.activeStationNumber);
+    const activeJobs = this.jobsQueryController.data.filter(j => {
+      if (Array.isArray(j.job_station)) {
+        return j.job_station.includes(this.activeStationNumber);
+      }
+      return j.job_station === this.activeStationNumber;
+    });
     const devices = this.devicesQueryController.data;
 
     return html`
