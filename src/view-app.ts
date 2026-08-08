@@ -58,19 +58,55 @@ export class ViewApp extends LitElement {
       display: flex;
       flex-direction: column;
       flex-shrink: 0;
-      transition: transform 0.3s ease;
+      transition: width 0.3s cubic-bezier(0.4, 0, 0.2, 1), transform 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+      overflow: hidden;
     }
+    aside.collapsed {
+      width: 72px;
+    }
+    aside.collapsed .drawer-logo {
+      width: 40px;
+      height: 40px;
+    }
+    aside.collapsed .drawer-title,
+    aside.collapsed .drawer-subtitle,
+    aside.collapsed .nav-text,
+    aside.collapsed .user-details,
+    aside.collapsed .logout-btn {
+      display: none !important;
+    }
+    aside.collapsed .nav-item {
+      justify-content: center;
+      padding: 12px 0;
+      margin: 4px 8px;
+    }
+    aside.collapsed .drawer-footer {
+      padding: 12px 8px;
+    }
+    aside.collapsed .user-profile-small {
+      gap: 0;
+    }
+    aside.collapsed .user-avatar {
+      width: 40px;
+      height: 40px;
+    }
+
     .drawer-logo-container {
       display: flex;
       flex-direction: column;
       align-items: center;
       padding: 24px 16px;
       border-bottom: 1px solid rgba(0, 0, 0, 0.05);
+      transition: padding 0.3s;
+    }
+    aside.collapsed .drawer-logo-container {
+      padding: 16px 8px;
     }
     .drawer-logo {
       width: 80px;
       height: 80px;
       margin-bottom: 12px;
+      transition: width 0.3s, height 0.3s;
     }
     .drawer-title {
       font-size: 1.8rem;
@@ -97,7 +133,7 @@ export class ViewApp extends LitElement {
       text-decoration: none;
       font-weight: 500;
       margin-bottom: 4px;
-      transition: background-color 0.2s, color 0.2s;
+      transition: background-color 0.2s, color 0.2s, justify-content 0.3s, padding 0.3s;
     }
     .nav-item:hover {
       background-color: rgba(0, 0, 0, 0.04);
@@ -200,7 +236,7 @@ export class ViewApp extends LitElement {
 
     /* Mobile handling overlay */
     .menu-btn {
-      display: none;
+      display: inline-block;
     }
 
     @media (max-width: 768px) {
@@ -213,10 +249,31 @@ export class ViewApp extends LitElement {
         transform: translateX(-100%);
       }
       aside.open {
-        transform: translateX(0);
+        transform: translateX(0) !important;
+        width: 260px !important;
       }
-      .menu-btn {
-        display: inline-block;
+      aside.open .drawer-logo {
+        width: 80px !important;
+        height: 80px !important;
+      }
+      aside.open .drawer-title,
+      aside.open .drawer-subtitle,
+      aside.open .nav-text,
+      aside.open .user-details,
+      aside.open .logout-btn {
+        display: block !important;
+      }
+      aside.open .nav-item {
+        justify-content: flex-start !important;
+        padding: 12px 16px !important;
+        margin: 0 0 4px 0 !important;
+      }
+      aside.open .drawer-footer {
+        padding: 16px !important;
+      }
+      aside.open .user-avatar {
+        width: 80px !important;
+        height: 80px !important;
       }
       .backdrop {
         display: none;
@@ -232,7 +289,7 @@ export class ViewApp extends LitElement {
   `;
 
   @state() private authState: UserContextValue = { user: null, profile: null, loading: true };
-  @state() private drawerOpen = false;
+  @state() private drawerOpen = true; // Default to open/expanded on desktop
   @state() private activeRoute = 'dashboard';
   @state() private headerTitle = 'Dashboard';
 
@@ -441,33 +498,33 @@ export class ViewApp extends LitElement {
         <!-- Overlay backdrop for mobile -->
         <div class="backdrop ${this.drawerOpen ? 'open' : ''}" @click=${() => this.drawerOpen = false}></div>
 
-        <aside class="${this.drawerOpen ? 'open' : ''}" ?hidden=${!showLayout}>
+        <aside class="${this.drawerOpen ? '' : 'collapsed'}" ?hidden=${!showLayout}>
           <div class="drawer-logo-container">
             <img class="drawer-logo" src="/images/logo/logo.svg" alt="IMES Logo"/>
             <h1 class="drawer-title">IMES</h1>
-            <p class="drawer-subtitle">Your Production Helper</p>
+            <p class="drawer-subtitle">Win The Day</p>
           </div>
 
           <nav>
-            <a class="nav-item ${this.activeRoute === 'dashboard' ? 'active' : ''}" href="/app/dashboard" @click=${() => this.drawerOpen = false}>
+            <a class="nav-item ${this.activeRoute === 'dashboard' ? 'active' : ''}" href="/app/dashboard" @click=${() => { if (window.innerWidth <= 768) this.drawerOpen = false; }}>
               <md-icon>dashboard</md-icon>
-              Dashboard
+              <span class="nav-text">Dashboard</span>
             </a>
-            <a class="nav-item ${this.activeRoute === 'setup' ? 'active' : ''}" href="/app/setup" @click=${() => this.drawerOpen = false}>
+            <a class="nav-item ${this.activeRoute === 'setup' ? 'active' : ''}" href="/app/setup" @click=${() => { if (window.innerWidth <= 768) this.drawerOpen = false; }}>
               <md-icon>settings_accessibility</md-icon>
-              Setup
+              <span class="nav-text">Setup</span>
             </a>
-            <a class="nav-item ${this.activeRoute === 'plan' ? 'active' : ''}" href="/app/plan" @click=${() => this.drawerOpen = false}>
+            <a class="nav-item ${this.activeRoute === 'plan' ? 'active' : ''}" href="/app/plan" @click=${() => { if (window.innerWidth <= 768) this.drawerOpen = false; }}>
               <md-icon>schedule</md-icon>
-              Plan
+              <span class="nav-text">Plan</span>
             </a>
-            <a class="nav-item ${this.activeRoute === 'track' ? 'active' : ''}" href="/app/track" @click=${() => this.drawerOpen = false}>
+            <a class="nav-item ${this.activeRoute === 'track' ? 'active' : ''}" href="/app/track" @click=${() => { if (window.innerWidth <= 768) this.drawerOpen = false; }}>
               <md-icon>query_stats</md-icon>
-              Track
+              <span class="nav-text">Track</span>
             </a>
-            <a class="nav-item ${this.activeRoute === 'settings' ? 'active' : ''}" href="/app/settings" @click=${() => this.drawerOpen = false}>
+            <a class="nav-item ${this.activeRoute === 'settings' ? 'active' : ''}" href="/app/settings" @click=${() => { if (window.innerWidth <= 768) this.drawerOpen = false; }}>
               <md-icon>settings</md-icon>
-              Settings
+              <span class="nav-text">Settings</span>
             </a>
           </nav>
 
@@ -486,7 +543,7 @@ export class ViewApp extends LitElement {
         <main>
           <header ?hidden=${!showLayout}>
             <div style="display: flex; align-items: center; gap: 12px;">
-              <md-icon-button class="menu-btn" @click=${() => this.drawerOpen = !this.drawerOpen}>
+              <md-icon-button @click=${() => this.drawerOpen = !this.drawerOpen}>
                 <md-icon>menu</md-icon>
               </md-icon-button>
               <h2 class="page-title">${this.headerTitle}</h2>

@@ -7,6 +7,7 @@ import { userContext, UserContextValue } from '../context/userContext.js';
 import { FirebaseQueryController } from '../controllers/FirebaseQueryController.js';
 import { FirebaseDocController } from '../controllers/FirebaseDocController.js';
 import { calculateRequiredActualQuantity, calculateOperationDuration } from '../utils/scheduling.js';
+import { formatDurationHMS } from '../utils/date.js';
 
 // Material Design 3 Imports
 import '@material/web/textfield/outlined-text-field.js';
@@ -238,10 +239,7 @@ export class ViewPlanOrder extends LitElement {
   }
 
   private formatDuration(seconds: number): string {
-    const hrs = Math.floor(seconds / 3600);
-    const mins = Math.floor((seconds % 3600) / 60);
-    const secs = seconds % 60;
-    return `${hrs.toString().padStart(2, '0')}h ${mins.toString().padStart(2, '0')}m ${secs.toString().padStart(2, '0')}s`;
+    return formatDurationHMS(seconds);
   }
 
   private async submitOrder() {

@@ -82,7 +82,7 @@ export class ViewDashboard extends LitElement {
             <md-icon>notifications</md-icon> Notification
           </button>
           <button class="tab-btn ${this.activeTab === 'statistics' ? 'active' : ''}" @click=${() => this.activeTab = 'statistics'}>
-            <md-icon>analytics</md-icon> Statistic
+            <md-icon>analytics</md-icon> Statistics
           </button>
         </div>
 

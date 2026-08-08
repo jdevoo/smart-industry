@@ -1,6 +1,11 @@
 import { LitElement, html, css } from 'lit';
 import { customElement } from 'lit/decorators.js';
 
+// Material Design 3 Imports
+import '@material/web/button/filled-button.js';
+import '@material/web/button/outlined-button.js';
+import '@material/web/icon/icon.js';
+
 @customElement('view-plan-production')
 export class ViewPlanProduction extends LitElement {
   static override styles = css`

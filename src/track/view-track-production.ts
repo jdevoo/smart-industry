@@ -5,7 +5,7 @@ import { ref as dbRef, push, set, remove, update, get } from 'firebase/database'
 import { db } from '../config/firebase.js';
 import { userContext, UserContextValue } from '../context/userContext.js';
 import { FirebaseQueryController } from '../controllers/FirebaseQueryController.js';
-import { displayDateFromTimestamp } from '../utils/date.js';
+import { formatTimeAndDate, formatDurationHMS, displayDateFromTimestamp } from '../utils/date.js';
 
 // Material Design 3 Imports
 import '@material/web/button/filled-button.js';
@@ -518,9 +518,12 @@ export class ViewTrackProduction extends LitElement {
 
   // Client helpers
   formatTime(timestamp?: number): string {
-    if (!timestamp) return 'N/A';
-    const date = new Date(timestamp * 1000);
-    return date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' });
+    return formatTimeAndDate(timestamp);
+  }
+
+  getActualDuration(start?: number, end?: number): string {
+    if (!start || !end) return '00:00:00';
+    return formatDurationHMS(end - start);
   }
 
   override render() {
@@ -585,6 +588,8 @@ export class ViewTrackProduction extends LitElement {
                       <div><strong>Estimate End:</strong> ${this.formatTime(job.end)}</div>
                       <div><strong>Actual Start:</strong> ${this.formatTime(job.actual_start)}</div>
                       <div><strong>Actual End:</strong> ${this.formatTime(job.actual_end)}</div>
+                      <div><strong>Actual Duration:</strong> ${this.getActualDuration(job.actual_start, job.actual_end)}</div>
+                      <div><strong>Defect Count:</strong> ${job.job_defect || 0} units</div>
                       <div><strong>Bound Sensor:</strong> <code>${job.job_sensor || 'Unassigned'}</code></div>
                     </div>
 
@@ -602,19 +607,18 @@ export class ViewTrackProduction extends LitElement {
                     </div>
 
                     <div class="control-btn-group">
-                      ${job.job_status === 'waiting' ? html`
-                        <md-filled-button @click=${() => this.receiveJob(job)}>
-                          <md-icon slot="icon">play_arrow</md-icon> Receive Job
-                        </md-filled-button>
-                      ` : ''}
+                      <md-filled-button 
+                        ?disabled=${job.job_status === 'wip' || job.job_status === 'done'}
+                        @click=${() => this.receiveJob(job)}>
+                        <md-icon slot="icon">play_arrow</md-icon> Receive Job
+                      </md-filled-button>
 
-                      ${job.job_status === 'wip' ? html`
-                        <md-filled-button 
-                          @click=${() => this.openFinishJobReport(job.$key, job.job_quantity)}
-                          style="--md-filled-button-container-color: #7cb342; --md-filled-button-label-text-color: #ffffff;">
-                          <md-icon slot="icon">done</md-icon> Finish Job
-                        </md-filled-button>
-                      ` : ''}
+                      <md-filled-button 
+                        ?disabled=${job.job_status === 'waiting' || job.job_status === 'done'}
+                        @click=${() => this.openFinishJobReport(job.$key, job.job_quantity)}
+                        style="--md-filled-button-container-color: #7cb342; --md-filled-button-label-text-color: #ffffff;">
+                        <md-icon slot="icon">done</md-icon> Finish Job
+                      </md-filled-button>
 
                       <md-outlined-button @click=${() => this.removeJob(job.$key)}>
                         <md-icon slot="icon">delete</md-icon> Remove Card

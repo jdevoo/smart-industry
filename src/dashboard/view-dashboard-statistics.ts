@@ -8,6 +8,9 @@ import { FirebaseDocController } from '../controllers/FirebaseDocController.js';
 import { FirebaseQueryController } from '../controllers/FirebaseQueryController.js';
 import { isLeapYear, dateFromDays } from '../utils/date.js';
 
+// Material Design 3 Button Imports
+import '@material/web/button/outlined-button.js';
+
 // ChartJS Modular imports
 import { Chart, BarController, CategoryScale, LinearScale, BarElement, Tooltip } from 'chart.js';
 
@@ -81,7 +84,7 @@ export class ViewDashboardStatistics extends LitElement {
     .days-column {
       grid-area: days;
       display: grid;
-      grid-template-rows: repeat(7, 10px);
+      grid-template-rows: repeat(7, 1fr);
       gap: 3px;
       list-style: none;
       padding: 0;
@@ -92,23 +95,22 @@ export class ViewDashboardStatistics extends LitElement {
       padding-right: 8px;
     }
     .days-column li {
-      height: 10px;
-      line-height: 10px;
+      display: flex;
+      align-items: center;
     }
     .squares-grid {
       grid-area: squares;
       display: grid;
       grid-gap: 3px;
-      grid-template-rows: repeat(7, 10px);
+      grid-template-rows: repeat(7, 1fr);
       grid-auto-flow: column;
-      grid-auto-columns: 10px;
+      grid-auto-columns: 1fr;
       list-style: none;
       padding: 0;
       margin: 0;
     }
     .squares-grid li {
-      width: 10px;
-      height: 10px;
+      aspect-ratio: 1;
       border-radius: 2px;
       background-color: #ededee;
       position: relative;

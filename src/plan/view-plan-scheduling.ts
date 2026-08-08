@@ -7,7 +7,7 @@ import { userContext, UserContextValue } from '../context/userContext.js';
 import { FirebaseQueryController } from '../controllers/FirebaseQueryController.js';
 import { FirebaseDocController } from '../controllers/FirebaseDocController.js';
 import { sortOrdersHeuristically } from '../utils/scheduling.js';
-import { displayDateFromTimestamp } from '../utils/date.js';
+import { displayDateFromTimestamp, formatDurationHM, formatTimeOnly } from '../utils/date.js';
 import { columnBodyRenderer, columnHeaderRenderer } from '@vaadin/grid/lit.js';
 
 // Material Design 3 & Vaadin Imports
@@ -118,11 +118,159 @@ export class ViewPlanScheduling extends LitElement {
     .badge-wip { color: #5e35b1; font-weight: 500; }
     .badge-done { color: #2e7d32; font-weight: 500; }
     .badge-late { color: #e53935; font-weight: 500; }
+    .badge-cancel { color: #888888; font-weight: 500; text-decoration: line-through; }
+
+    /* Station buttons row */
+    .stations-row {
+      display: flex;
+      gap: 8px;
+      margin-bottom: 16px;
+      overflow-x: auto;
+      scrollbar-width: none;
+    }
+    .stations-row::-webkit-scrollbar {
+      display: none;
+    }
+    .station-btn {
+      padding: 6px 14px;
+      border: 1px solid rgba(0,0,0,0.15);
+      background-color: #ffffff;
+      border-radius: 6px;
+      font-weight: 500;
+      color: #666;
+      cursor: pointer;
+      white-space: nowrap;
+      font-size: 0.85rem;
+      transition: background-color 0.2s, color 0.2s;
+    }
+    .station-btn:hover {
+      background-color: rgba(0, 0, 0, 0.04);
+      color: #202020;
+    }
+    .station-btn.active {
+      background-color: #202020;
+      color: #ffffff;
+      border-color: #202020;
+    }
+
+    /* Gantt Chart Styling */
+    .gantt-card {
+      background: #ffffff;
+      border-radius: 12px;
+      border: 1px solid rgba(0,0,0,0.08);
+      padding: 24px;
+      box-shadow: 0 1px 3px rgba(0,0,0,0.05);
+    }
+    .gantt-timeline {
+      display: flex;
+      flex-direction: column;
+      gap: 16px;
+      margin-top: 20px;
+      background-color: #fafafa;
+      padding: 16px;
+      border-radius: 8px;
+      border: 1px solid rgba(0,0,0,0.04);
+      overflow-x: auto;
+    }
+    .gantt-row {
+      display: flex;
+      align-items: center;
+      min-height: 54px;
+      border-bottom: 1px dashed rgba(0,0,0,0.06);
+      padding-bottom: 8px;
+    }
+    .gantt-row:last-child {
+      border-bottom: none;
+      padding-bottom: 0;
+    }
+    .gantt-station-label {
+      width: 140px;
+      font-weight: 500;
+      font-size: 0.9rem;
+      color: #202020;
+      flex-shrink: 0;
+    }
+    .gantt-track {
+      position: relative;
+      flex: 1;
+      height: 36px;
+      background-color: #f0f0f0;
+      border-radius: 6px;
+      min-width: 600px;
+    }
+    .gantt-bar {
+      position: absolute;
+      top: 4px;
+      bottom: 4px;
+      border-radius: 4px;
+      color: #ffffff;
+      font-size: 0.72rem;
+      font-weight: 500;
+      display: flex;
+      align-items: center;
+      padding: 0 8px;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      box-shadow: 0 2px 4px rgba(0,0,0,0.15);
+      cursor: pointer;
+      transition: transform 0.2s, box-shadow 0.2s;
+    }
+    .gantt-bar:hover {
+      transform: scaleY(1.05);
+      z-index: 10;
+      box-shadow: 0 4px 8px rgba(0,0,0,0.25);
+    }
+    .gantt-axis {
+      display: flex;
+      margin-left: 140px;
+      padding-top: 8px;
+      font-size: 0.75rem;
+      color: #888;
+      justify-content: space-between;
+      min-width: 600px;
+    }
+
+    /* Grid Action Buttons style */
+    .action-btn {
+      background: none;
+      border: none;
+      cursor: pointer;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      padding: 6px;
+      border-radius: 50%;
+      transition: background-color 0.2s, transform 0.1s;
+    }
+    .action-btn:active {
+      transform: scale(0.92);
+    }
+    .action-btn md-icon {
+      --md-icon-size: 18px;
+      font-size: 18px;
+      width: 18px;
+      height: 18px;
+    }
+    .action-btn.cancel-btn {
+      color: #ef6c00; /* Amber/Orange for cancellation */
+    }
+    .action-btn.cancel-btn:hover {
+      background-color: rgba(239, 108, 0, 0.08);
+    }
+    .action-btn.delete-btn {
+      color: #d32f2f; /* Red for permanent delete */
+    }
+    .action-btn.delete-btn:hover {
+      background-color: rgba(211, 47, 47, 0.08);
+    }
   `;
 
   @consume({ context: userContext, subscribe: true })
   @state()
   private authState!: UserContextValue;
+
+  @state() private activeStationNumber: number | null = null;
 
   // Real-time Queries
   private orderQueryController = new FirebaseQueryController<OrderItem>(this, () =>
@@ -150,9 +298,7 @@ export class ViewPlanScheduling extends LitElement {
   );
 
   formatDuration(seconds: number): string {
-    const hrs = Math.floor(seconds / 3600);
-    const mins = Math.floor((seconds % 3600) / 60);
-    return `${hrs}h ${mins}m`;
+    return formatDurationHM(seconds);
   }
 
   private async clearSchedule() {
@@ -304,7 +450,7 @@ export class ViewPlanScheduling extends LitElement {
     const companyKey = this.authState.profile?.key;
     if (!companyKey) return;
 
-    if (confirm('Are you sure you want to cancel and delete this order booking?')) {
+    if (confirm('Are you sure you want to delete this order booking permanently?')) {
       try {
         await remove(dbRef(db, `/data/${companyKey}/orderData/${key}`));
       } catch (err) {
@@ -313,28 +459,73 @@ export class ViewPlanScheduling extends LitElement {
     }
   }
 
-  private handleGridClick(e: Event) {
-    const target = e.target as HTMLElement;
-    const deleteBtn = target.closest('.delete-order-btn');
-    if (deleteBtn) {
-      const grid = this.shadowRoot?.getElementById('ordersGrid') as any;
-      const item = (e as any).model?.item || (grid ? grid.selectedItems[0] : null);
-      if (item && item.$key) {
-        this.removeOrder(item.$key);
+  private async cancelOrder(key: string) {
+    const companyKey = this.authState.profile?.key;
+    if (!companyKey) return;
+
+    if (confirm('Are you sure you want to cancel this order booking? This will stop it from being scheduled.')) {
+      try {
+        await update(dbRef(db, `/data/${companyKey}/orderData/${key}`), { order_status: 'cancel' });
+      } catch (err) {
+        console.error('Failed to cancel order', err);
+      }
+    }
+  }
+
+  private async cancelJob(key: string) {
+    const companyKey = this.authState.profile?.key;
+    if (!companyKey) return;
+
+    if (confirm('Are you sure you want to cancel and delete this specific dispatched job from the active schedule timeline?')) {
+      try {
+        await remove(dbRef(db, `/data/${companyKey}/scheduleData/${key}`));
+      } catch (err) {
+        console.error('Failed to cancel dispatched job', err);
       }
     }
   }
 
   override render() {
-    if (this.orderQueryController.loading || this.scheduleQueryController.loading) {
+    if (this.orderQueryController.loading || this.scheduleQueryController.loading || this.stationQueryController.loading) {
       return html`<p>Loading operational dispatch workspace...</p>`;
     }
 
     const orders = this.orderQueryController.data;
-    const activeJobs = this.scheduleQueryController.data;
+    const allJobs = this.scheduleQueryController.data;
+    const stations = this.stationQueryController.data;
+
+    // Filter jobs by activeStationNumber if selected
+    const activeJobs = allJobs.filter(j => {
+      if (this.activeStationNumber === null) return true;
+      if (Array.isArray(j.job_station)) {
+        return j.job_station.includes(this.activeStationNumber);
+      }
+      return j.job_station === this.activeStationNumber;
+    });
 
     const schedConfig = this.scheduleConfigController.data;
     const profileConfig = this.profileConfigController.data;
+
+    // Calculate Gantt overall range
+    let minStart = Infinity;
+    let maxEnd = -Infinity;
+    allJobs.forEach(job => {
+      if (job.start < minStart) minStart = job.start;
+      if (job.end > maxEnd) maxEnd = job.end;
+    });
+
+    const totalDuration = maxEnd - minStart;
+    const hasGanttData = allJobs.length > 0 && totalDuration > 0 && minStart !== Infinity;
+
+    // Create timeline ticks for axis labels if Gantt data is available
+    const ticks: string[] = [];
+    if (hasGanttData) {
+      const numTicks = 6;
+      for (let i = 0; i < numTicks; i++) {
+        const time = minStart + (totalDuration * i) / (numTicks - 1);
+        ticks.push(this.formatTime(time));
+      }
+    }
 
     return html`
       <div class="scheduling-pane">
@@ -368,7 +559,7 @@ export class ViewPlanScheduling extends LitElement {
             <h3 class="card-title">Pending Booking Waitlist</h3>
           </div>
 
-          <vaadin-grid id="ordersGrid" .items=${orders} style="height: 280px;" @click=${this.handleGridClick}>
+          <vaadin-grid id="ordersGrid" .items=${orders} style="height: 280px;">
             <vaadin-grid-column
               flex="0.5"
               ${columnHeaderRenderer(() => html`Order No`, [])}
@@ -414,12 +605,19 @@ export class ViewPlanScheduling extends LitElement {
             ></vaadin-grid-column>
 
             <vaadin-grid-column
-              flex="0.5"
-              ${columnHeaderRenderer(() => html`Action`, [])}
-              ${columnBodyRenderer((_item: any) => html`
-                <button class="delete-order-btn" style="background:none; border:none; color:#e53935; cursor:pointer; display:flex; align-items:center; justify-content:center; width:36px; height:36px;">
-                  <span class="material-symbols-outlined" style="font-size: 18px;">close</span>
-                </button>
+              flex="0.8"
+              ${columnHeaderRenderer(() => html`Actions`, [])}
+              ${columnBodyRenderer((item: any) => html`
+                <div style="display:flex; gap: 8px; justify-content:flex-start; align-items:center;">
+                  ${item.order_status !== 'cancel' && item.order_status !== 'done' ? html`
+                    <button class="action-btn cancel-btn" @click=${() => this.cancelOrder(item.$key)} title="Cancel Booking (keeps history)">
+                      <md-icon>block</md-icon>
+                    </button>
+                  ` : ''}
+                  <button class="action-btn delete-btn" @click=${() => this.removeOrder(item.$key)} title="Delete Booking permanently">
+                    <md-icon>delete_forever</md-icon>
+                  </button>
+                </div>
               `, [])}
             ></vaadin-grid-column>
           </vaadin-grid>
@@ -436,8 +634,24 @@ export class ViewPlanScheduling extends LitElement {
 
         <!-- 2. Computed Job timeline list card -->
         <div class="ledger-card">
-          <div class="card-header">
+          <div class="card-header" style="flex-direction: column; align-items: flex-start; gap: 12px; margin-bottom: 20px;">
             <h3 class="card-title">Live Dispatched Jobs Sequence</h3>
+            
+            <!-- Stations Selector row -->
+            <div class="stations-row" style="margin-bottom: 0;">
+              <button 
+                class="station-btn ${this.activeStationNumber === null ? 'active' : ''}" 
+                @click=${() => this.activeStationNumber = null}>
+                All Stations
+              </button>
+              ${stations.map(st => html`
+                <button 
+                  class="station-btn ${this.activeStationNumber === st.st_number ? 'active' : ''}" 
+                  @click=${() => this.activeStationNumber = st.st_number}>
+                  Station ${st.st_number} (${st.st_name})
+                </button>
+              `)}
+            </div>
           </div>
 
           <vaadin-grid .items=${activeJobs} style="height: 320px;">
@@ -484,7 +698,75 @@ export class ViewPlanScheduling extends LitElement {
                 <span class="badge-${item.job_status}">${item.job_status}</span>
               `, [])}
             ></vaadin-grid-column>
+
+            <vaadin-grid-column
+              flex="0.8"
+              ${columnHeaderRenderer(() => html`Actions`, [])}
+              ${columnBodyRenderer((item: any) => html`
+                <div style="display:flex; gap: 8px; justify-content:flex-start; align-items:center;">
+                  ${item.job_status === 'waiting' ? html`
+                    <button class="action-btn delete-btn" @click=${() => this.cancelJob(item.$key)} title="Remove from Schedule">
+                      <md-icon>delete</md-icon>
+                    </button>
+                  ` : html`
+                    <span style="font-size:0.75rem; color:#888; font-style:italic; font-weight:500;">Running</span>
+                  `}
+                </div>
+              `, [])}
+            ></vaadin-grid-column>
           </vaadin-grid>
+        </div>
+
+        <!-- 3. Scheduling Gantt Chart -->
+        <div class="gantt-card">
+          <h3 class="card-title">Scheduling Gantt Chart</h3>
+          <p style="font-size:0.85rem; color:#666; margin:6px 0 16px 0; line-height:1.4;">
+            This visual chart illustrates the chronological flow of part processing across your workstations, sorted by Earliest Due Date (EDD) then Shortest Processing Time (SPT):
+          </p>
+
+          ${!hasGanttData ? html`
+            <div style="text-align:center; color:#888; font-style:italic; padding: 32px; background:#fafafa; border-radius:8px; border:1px dashed rgba(0,0,0,0.15);">
+              No active schedule has been compiled yet. Run rescheduling above to project visual timelines.
+            </div>
+          ` : html`
+            <div class="gantt-timeline">
+              ${stations.map(st => {
+                const stationJobs = allJobs.filter(j => {
+                  if (Array.isArray(j.job_station)) {
+                    return j.job_station.includes(st.st_number);
+                  }
+                  return j.job_station === st.st_number;
+                });
+
+                return html`
+                  <div class="gantt-row">
+                    <div class="gantt-station-label">
+                      ST-${st.st_number} (${st.st_name})
+                    </div>
+                    <div class="gantt-track">
+                      ${stationJobs.map(job => {
+                        const startPct = ((job.start - minStart) / totalDuration) * 100;
+                        const durationPct = ((job.end - job.start) / totalDuration) * 100;
+                        return html`
+                          <div 
+                            class="gantt-bar" 
+                            style="left: ${startPct}%; width: ${durationPct}%; background-color: ${job.order_color || '#202020'};"
+                            title="Order #${job.order_no} - ${job.job_part} (${job.job_quantity} units)&#10;Start: ${this.formatTime(job.start)}&#10;End: ${this.formatTime(job.end)}">
+                            #${job.order_no}: ${job.job_part}
+                          </div>
+                        `;
+                      })}
+                    </div>
+                  </div>
+                `;
+              })}
+              
+              <!-- Timeline X-Axis Ticks -->
+              <div class="gantt-axis">
+                ${ticks.map(t => html`<span>${t}</span>`)}
+              </div>
+            </div>
+          `}
         </div>
       </div>
     `;
@@ -497,9 +779,7 @@ export class ViewPlanScheduling extends LitElement {
   }
 
   formatTime(timestamp: number): string {
-    if (!timestamp) return 'N/A';
-    const date = new Date(timestamp * 1000);
-    return date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' });
+    return formatTimeOnly(timestamp);
   }
 }
 

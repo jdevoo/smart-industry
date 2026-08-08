@@ -1,23 +1,24 @@
 import { defineConfig } from 'vite';
 import { VitePWA } from 'vite-plugin-pwa';
 
-export default defineConfig({
-  root: '.',
-  build: {
-    outDir: 'dist',
-    emptyOutDir: true,
-    target: 'esnext',
-    sourcemap: true
-  },
-  server: {
-    port: 5173,
-    open: true
-  },
-  plugins: [
-    VitePWA({
-      disable: true,
-      registerType: 'autoUpdate',
-      injectRegister: 'auto',
+export default defineConfig(({ mode }) => {
+  return {
+    root: '.',
+    build: {
+      outDir: 'dist',
+      emptyOutDir: true,
+      target: 'esnext',
+      sourcemap: true
+    },
+    server: {
+      port: 5173,
+      open: true
+    },
+    plugins: [
+      VitePWA({
+        disable: mode === 'development',
+        registerType: 'autoUpdate',
+        injectRegister: 'auto',
       workbox: {
         globPatterns: ['**/*.{js,css,html,ico,png,svg,json}'],
         navigateFallback: 'index.html',
@@ -68,4 +69,5 @@ export default defineConfig({
       }
     })
   ]
+  };
 });
