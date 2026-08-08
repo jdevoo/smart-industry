@@ -15,6 +15,13 @@ import '@material/web/select/outlined-select.js';
 import '@material/web/select/select-option.js';
 import '@material/web/switch/switch.js';
 import '@material/web/icon/icon.js';
+import '@material/web/iconbutton/icon-button.js';
+
+interface MachineItem {
+  $key: string;
+  name: string;
+  number: number;
+}
 
 interface WIPJobItem {
   $key: string;
@@ -269,6 +276,13 @@ export class ViewTrackProduction extends LitElement {
   @state() private newDeviceType = 'nodeMCU esp8266';
   @state() private newDeviceMachine = '';
 
+  // Edit Device modal states
+  @state() private showEditDeviceDialog = false;
+  @state() private editDeviceKey = '';
+  @state() private editDeviceName = '';
+  @state() private editDeviceType = 'nodeMCU esp8266';
+  @state() private editDeviceMachine = '';
+
   // Finish Job modal states
   @state() private activeJobReportingKey: string | null = null;
   @state() private reportingGoodCount = 0;
@@ -291,6 +305,9 @@ export class ViewTrackProduction extends LitElement {
       if (this.showAddDeviceDialog) {
         this.showAddDeviceDialog = false;
       }
+      if (this.showEditDeviceDialog) {
+        this.showEditDeviceDialog = false;
+      }
       if (this.activeJobReportingKey) {
         this.activeJobReportingKey = null;
       }
@@ -308,6 +325,10 @@ export class ViewTrackProduction extends LitElement {
 
   private stationsQueryController = new FirebaseQueryController<StationItem>(this, () =>
     this.authState.profile?.key ? `/data/${this.authState.profile.key}/factoryData/station` : null
+  );
+
+  private machinesQueryController = new FirebaseQueryController<MachineItem>(this, () =>
+    this.authState.profile?.key ? `/data/${this.authState.profile.key}/factoryData/machine` : null
   );
 
   // Monitor pulse counts from bound devices to trigger auto-completion
@@ -516,6 +537,40 @@ export class ViewTrackProduction extends LitElement {
     }
   }
 
+  private openEditDeviceDialog(device: DeviceItem) {
+    this.editDeviceKey = device.$key;
+    this.editDeviceName = device.name;
+    this.editDeviceType = device.type || 'nodeMCU esp8266';
+    this.editDeviceMachine = device.machine || '';
+    this.showEditDeviceDialog = true;
+  }
+
+  private async updateIoTDevice() {
+    const companyKey = this.authState.profile?.key;
+    if (!companyKey) return;
+
+    if (!this.editDeviceName) {
+      alert('Device Identifier Name is a required field.');
+      return;
+    }
+
+    const payload = {
+      name: this.editDeviceName,
+      type: this.editDeviceType,
+      machine: this.editDeviceMachine,
+      update: Math.round(Date.now() / 1000)
+    };
+
+    try {
+      const deviceRef = dbRef(db, `/data/${companyKey}/factoryData/device/${this.editDeviceKey}`);
+      await update(deviceRef, payload);
+
+      this.showEditDeviceDialog = false;
+    } catch (err) {
+      console.error('Error updating device', err);
+    }
+  }
+
   // Client helpers
   formatTime(timestamp?: number): string {
     return formatTimeAndDate(timestamp);
@@ -527,7 +582,7 @@ export class ViewTrackProduction extends LitElement {
   }
 
   override render() {
-    if (this.jobsQueryController.loading || this.devicesQueryController.loading || this.stationsQueryController.loading) {
+    if (this.jobsQueryController.loading || this.devicesQueryController.loading || this.stationsQueryController.loading || this.machinesQueryController.loading) {
       return html`<p>Establishing live shopfloor monitors connection...</p>`;
     }
 
@@ -539,6 +594,7 @@ export class ViewTrackProduction extends LitElement {
       return j.job_station === this.activeStationNumber;
     });
     const devices = this.devicesQueryController.data;
+    const machines = this.machinesQueryController.data || [];
 
     return html`
       <div class="track-grid">
@@ -658,9 +714,12 @@ export class ViewTrackProduction extends LitElement {
                     <div><strong>Last Heartbeat:</strong> ${this.formatTime(dev.update)}</div>
                   </div>
 
-                  <div style="display:flex; gap:8px; margin-top:8px; border-top: 1px dashed rgba(0,0,0,0.1); padding-top:12px;">
+                  <div style="display:flex; gap:8px; margin-top:8px; border-top: 1px dashed rgba(0,0,0,0.1); padding-top:12px; align-items:center;">
                     <md-outlined-button @click=${() => this.resetDeviceCounter(dev.$key)} style="flex:1;">Reset Count</md-outlined-button>
-                    <md-icon-button @click=${() => this.removeDevice(dev.$key)}>
+                    <md-icon-button @click=${() => this.openEditDeviceDialog(dev)} title="Edit Device Details">
+                      <md-icon>edit</md-icon>
+                    </md-icon-button>
+                    <md-icon-button @click=${() => this.removeDevice(dev.$key)} title="Delete Device">
                       <md-icon>delete</md-icon>
                     </md-icon-button>
                   </div>
@@ -694,16 +753,66 @@ export class ViewTrackProduction extends LitElement {
                 <md-select-option value="RFID scanner"><div slot="headline">RFID Batch Reader</div></md-select-option>
               </md-outlined-select>
 
-              <md-outlined-text-field 
-                label="Allocated Machine No. / Key" 
+              <md-outlined-select 
+                label="Allocated Target Machine" 
                 .value=${this.newDeviceMachine}
-                @input=${(e: any) => this.newDeviceMachine = e.target.value}>
-              </md-outlined-text-field>
+                @change=${(e: any) => this.newDeviceMachine = e.target.value}>
+                <md-select-option value=""><div slot="headline">-- No Machine Allocated --</div></md-select-option>
+                ${machines.map(m => html`
+                  <md-select-option value=${m.name}>
+                    <div slot="headline">${m.name} (No. ${m.number})</div>
+                  </md-select-option>
+                `)}
+              </md-outlined-select>
             </div>
 
             <div class="dialog-actions">
               <md-outlined-button @click=${() => this.showAddDeviceDialog = false}>Cancel</md-outlined-button>
               <md-filled-button @click=${this.addIoTDevice}>Save Device</md-filled-button>
+            </div>
+          </div>
+        </div>
+      ` : ''}
+
+      <!-- Edit Device Dialog Modal -->
+      ${this.showEditDeviceDialog ? html`
+        <div class="overlay">
+          <div class="dialog">
+            <h4>Edit Telemetry Hardware</h4>
+            
+            <div class="form-group">
+              <md-outlined-text-field 
+                label="Device Identifier Name" 
+                .value=${this.editDeviceName}
+                @input=${(e: any) => this.editDeviceName = e.target.value}
+                required>
+              </md-outlined-text-field>
+
+              <md-outlined-select 
+                label="Sensor Tech Type" 
+                .value=${this.editDeviceType}
+                @change=${(e: any) => this.editDeviceType = e.target.value}>
+                <md-select-option value="nodeMCU esp8266"><div slot="headline">nodeMCU ESP8266 (Wi-Fi SoC)</div></md-select-option>
+                <md-select-option value="IR Sensor"><div slot="headline">Infrared Proximity Counter</div></md-select-option>
+                <md-select-option value="RFID scanner"><div slot="headline">RFID Batch Reader</div></md-select-option>
+              </md-outlined-select>
+
+              <md-outlined-select 
+                label="Allocated Target Machine" 
+                .value=${this.editDeviceMachine}
+                @change=${(e: any) => this.editDeviceMachine = e.target.value}>
+                <md-select-option value=""><div slot="headline">-- No Machine Allocated --</div></md-select-option>
+                ${machines.map(m => html`
+                  <md-select-option value=${m.name}>
+                    <div slot="headline">${m.name} (No. ${m.number})</div>
+                  </md-select-option>
+                `)}
+              </md-outlined-select>
+            </div>
+
+            <div class="dialog-actions">
+              <md-outlined-button @click=${() => this.showEditDeviceDialog = false}>Cancel</md-outlined-button>
+              <md-filled-button @click=${this.updateIoTDevice}>Save Changes</md-filled-button>
             </div>
           </div>
         </div>
