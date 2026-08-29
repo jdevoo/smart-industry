@@ -5,6 +5,7 @@ import { ref as dbRef, push, set, remove, update } from 'firebase/database';
 import { db } from '../config/firebase.js';
 import { userContext, UserContextValue } from '../context/userContext.js';
 import { FirebaseQueryController } from '../controllers/FirebaseQueryController.js';
+import { DbFolder, getCompanyPath } from '../config/db-paths.js';
 
 // Material Design 3 UI Imports
 import '@material/web/textfield/outlined-text-field.js';
@@ -192,7 +193,7 @@ export class ViewSetupMachine extends LitElement {
 
   // Real-time machines list controller
   private machinesController = new FirebaseQueryController<MachineItem>(this, () =>
-    this.authState.profile?.key ? `/data/${this.authState.profile.key}/factoryData/machine` : null
+    this.authState.profile?.key ? getCompanyPath(this.authState.profile.key, DbFolder.FACTORY_MACHINE) : null
   );
 
   private openAddDialog() {
@@ -223,7 +224,7 @@ export class ViewSetupMachine extends LitElement {
 
     if (confirm('Are you sure you want to remove this machine configuration?')) {
       try {
-        await remove(dbRef(db, `/data/${companyKey}/factoryData/machine/${key}`));
+        await remove(dbRef(db, getCompanyPath(companyKey, DbFolder.FACTORY_MACHINE, key)));
       } catch (err) {
         console.error('Failed to remove machine', err);
       }
@@ -250,10 +251,10 @@ export class ViewSetupMachine extends LitElement {
     try {
       if (this.editingKey) {
         // Edit mode
-        await update(dbRef(db, `/data/${companyKey}/factoryData/machine/${this.editingKey}`), payload);
+        await update(dbRef(db, getCompanyPath(companyKey, DbFolder.FACTORY_MACHINE, this.editingKey)), payload);
       } else {
         // Add mode
-        const newMachineRef = push(dbRef(db, `/data/${companyKey}/factoryData/machine`));
+        const newMachineRef = push(dbRef(db, getCompanyPath(companyKey, DbFolder.FACTORY_MACHINE)));
         await set(newMachineRef, payload);
       }
       this.showEditor = false;
@@ -326,7 +327,7 @@ export class ViewSetupMachine extends LitElement {
               <md-outlined-text-field 
                 label="Machine Name" 
                 .value=${this.editName}
-                @input=${(e: any) => this.editName = e.target.value}
+                @input=${(e: Event) => this.editName = (e.target as HTMLInputElement).value}
                 required>
               </md-outlined-text-field>
 
@@ -334,20 +335,20 @@ export class ViewSetupMachine extends LitElement {
                 label="Machine Number" 
                 type="number" 
                 .value=${this.editNumber.toString()}
-                @input=${(e: any) => this.editNumber = Number(e.target.value)}>
+                @input=${(e: Event) => this.editNumber = Number((e.target as HTMLInputElement).value)}>
               </md-outlined-text-field>
 
               <md-outlined-text-field 
                 label="Max Capacity (items/hour)" 
                 type="number" 
                 .value=${this.editCapacity}
-                @input=${(e: any) => this.editCapacity = e.target.value}>
+                @input=${(e: Event) => this.editCapacity = (e.target as HTMLInputElement).value}>
               </md-outlined-text-field>
 
               <md-outlined-text-field 
                 label="Asset Description" 
                 .value=${this.editDescription}
-                @input=${(e: any) => this.editDescription = e.target.value}>
+                @input=${(e: Event) => this.editDescription = (e.target as HTMLInputElement).value}>
               </md-outlined-text-field>
 
               <div class="checkbox-container" style="display:flex; align-items:center; gap:8px;">
@@ -355,7 +356,7 @@ export class ViewSetupMachine extends LitElement {
                   type="checkbox" 
                   id="machineStatusChk" 
                   .checked=${this.editState}
-                  @change=${(e: any) => this.editState = e.target.checked}/>
+                  @change=${(e: Event) => this.editState = (e.target as HTMLInputElement).checked}/>
                 <label for="machineStatusChk">Machine Operational (Active State)</label>
               </div>
             </div>
