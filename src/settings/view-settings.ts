@@ -778,9 +778,9 @@ export class ViewSettings extends LitElement {
             @click=${this.deleteAccount} 
             ?disabled=${this.companyUsersQueryController.data.length <= 1}
             style="--md-outlined-button-label-text-color: #c62828; --md-outlined-button-outline-color: #fde8e8;"
-            title="${this.companyUsersQueryController.data.length <= 1 ? 'Cannot delete your profile as the sole remaining company user. Use Terminate Service instead.' : 'Delete your personal profile credentials'}">
+            title="${this.companyUsersQueryController.data.length <= 1 ? 'Cannot delete your profile as the sole remaining administrator. Use Terminate Service instead.' : 'Delete your personal profile credentials'}">
             <md-icon slot="icon">no_accounts</md-icon> 
-            ${this.companyUsersQueryController.data.length <= 1 ? 'Delete Profile (Sole User Protected)' : 'Delete User Profile'}
+            ${this.companyUsersQueryController.data.length <= 1 ? 'Delete Profile (Admin Protected)' : 'Delete User Profile'}
           </md-outlined-button>
         </div>
 
