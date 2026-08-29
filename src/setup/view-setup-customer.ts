@@ -5,6 +5,7 @@ import { ref as dbRef, push, set, remove, update } from 'firebase/database';
 import { db } from '../config/firebase.js';
 import { userContext, UserContextValue } from '../context/userContext.js';
 import { FirebaseQueryController } from '../controllers/FirebaseQueryController.js';
+import { DbFolder, getCompanyPath } from '../config/db-paths.js';
 
 // Material Design 3 UI Imports
 import '@material/web/textfield/outlined-text-field.js';
@@ -231,7 +232,7 @@ export class ViewSetupCustomer extends LitElement {
 
   // Real-time Queries
   private customerController = new FirebaseQueryController<CustomerItem>(this, () =>
-    this.authState.profile?.key ? `/data/${this.authState.profile.key}/factoryData/customer` : null
+    this.authState.profile?.key ? getCompanyPath(this.authState.profile.key, DbFolder.FACTORY_CUSTOMER) : null
   );
 
   private openAddDialog() {
@@ -266,7 +267,7 @@ export class ViewSetupCustomer extends LitElement {
 
     if (confirm('Are you sure you want to delete this customer? All historical tracking links will remain but the profile will be removed.')) {
       try {
-        await remove(dbRef(db, `/data/${companyKey}/factoryData/customer/${key}`));
+        await remove(dbRef(db, getCompanyPath(companyKey, DbFolder.FACTORY_CUSTOMER, key)));
       } catch (err) {
         console.error('Failed to remove customer', err);
       }
@@ -307,10 +308,10 @@ export class ViewSetupCustomer extends LitElement {
     try {
       if (this.editingKey) {
         // Edit Mode
-        await update(dbRef(db, `/data/${companyKey}/factoryData/customer/${this.editingKey}`), payload);
+        await update(dbRef(db, getCompanyPath(companyKey, DbFolder.FACTORY_CUSTOMER, this.editingKey)), payload);
       } else {
         // Add Mode
-        const newRef = push(dbRef(db, `/data/${companyKey}/factoryData/customer`));
+        const newRef = push(dbRef(db, getCompanyPath(companyKey, DbFolder.FACTORY_CUSTOMER)));
         await set(newRef, {
           ...payload,
           created: Math.round(Date.now() / 1000)
@@ -406,13 +407,13 @@ export class ViewSetupCustomer extends LitElement {
                 <md-outlined-text-field 
                   label="First Name" 
                   .value=${this.editFname}
-                  @input=${(e: any) => this.editFname = e.target.value}
+                  @input=${(e: Event) => this.editFname = (e.target as HTMLInputElement).value}
                   required>
                 </md-outlined-text-field>
                 <md-outlined-text-field 
                   label="Last Name" 
                   .value=${this.editLname}
-                  @input=${(e: any) => this.editLname = e.target.value}
+                  @input=${(e: Event) => this.editLname = (e.target as HTMLInputElement).value}
                   required>
                 </md-outlined-text-field>
               </div>
@@ -421,7 +422,7 @@ export class ViewSetupCustomer extends LitElement {
                 label="Email Address" 
                 type="email"
                 .value=${this.editEmail}
-                @input=${(e: any) => this.editEmail = e.target.value}
+                @input=${(e: Event) => this.editEmail = (e.target as HTMLInputElement).value}
                 required>
               </md-outlined-text-field>
 
@@ -429,13 +430,13 @@ export class ViewSetupCustomer extends LitElement {
                 label="Mobile Phone" 
                 type="tel"
                 .value=${this.editMobile}
-                @input=${(e: any) => this.editMobile = e.target.value}>
+                @input=${(e: Event) => this.editMobile = (e.target as HTMLInputElement).value}>
               </md-outlined-text-field>
 
               <md-outlined-text-field 
                 label="Corporate or Shipping Address" 
                 .value=${this.editAddress}
-                @input=${(e: any) => this.editAddress = e.target.value}>
+                @input=${(e: Event) => this.editAddress = (e.target as HTMLInputElement).value}>
               </md-outlined-text-field>
             </div>
 
