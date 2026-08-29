@@ -89,19 +89,19 @@ export class ViewLogin extends LitElement {
     .links-container a:hover {
       text-decoration: underline;
     }
-    .toast-alert {
+    .form-alert {
       padding: 12px 16px;
       border-radius: 6px;
       margin-top: 16px;
       font-size: 0.95rem;
       text-align: center;
     }
-    .toast-error {
+    .alert-error {
       background-color: #fde8e8;
       color: #e53935;
       border: 1px solid #f8b4b4;
     }
-    .toast-success {
+    .alert-success {
       background-color: #eafaf1;
       color: #2e7d32;
       border: 1px solid #c3e6cb;
@@ -251,8 +251,8 @@ export class ViewLogin extends LitElement {
           ${this.currentForm === 'register' ? this.renderRegisterForm() : ''}
           ${this.currentForm === 'reset' ? this.renderResetForm() : ''}
 
-          ${this.errorMsg ? html`<div class="toast-alert toast-error">${this.errorMsg}</div>` : ''}
-          ${this.successMsg ? html`<div class="toast-alert toast-success">${this.successMsg}</div>` : ''}
+          ${this.errorMsg ? html`<div class="form-alert alert-error">${this.errorMsg}</div>` : ''}
+          ${this.successMsg ? html`<div class="form-alert alert-success">${this.successMsg}</div>` : ''}
         </article>
       </section>
     `;
