@@ -5,6 +5,7 @@ import { ref as dbRef, push, set, remove, update } from 'firebase/database';
 import { db } from '../config/firebase.js';
 import { userContext, UserContextValue } from '../context/userContext.js';
 import { FirebaseQueryController } from '../controllers/FirebaseQueryController.js';
+import { DbFolder, getCompanyPath } from '../config/db-paths.js';
 
 // Material Design 3 UI Imports
 import '@material/web/textfield/outlined-text-field.js';
@@ -253,11 +254,11 @@ export class ViewSetupStation extends LitElement {
 
   // Controllers
   private stationsController = new FirebaseQueryController<StationItem>(this, () =>
-    this.authState.profile?.key ? `/data/${this.authState.profile.key}/factoryData/station` : null
+    this.authState.profile?.key ? getCompanyPath(this.authState.profile.key, DbFolder.FACTORY_STATION) : null
   );
 
   private machinesController = new FirebaseQueryController<MachineItem>(this, () =>
-    this.authState.profile?.key ? `/data/${this.authState.profile.key}/factoryData/machine` : null
+    this.authState.profile?.key ? getCompanyPath(this.authState.profile.key, DbFolder.FACTORY_MACHINE) : null
   );
 
   private openAddDialog() {
@@ -285,7 +286,7 @@ export class ViewSetupStation extends LitElement {
 
     if (confirm('Are you sure you want to delete this station? All machine associations inside it will be severed.')) {
       try {
-        await remove(dbRef(db, `/data/${companyKey}/factoryData/station/${key}`));
+        await remove(dbRef(db, getCompanyPath(companyKey, DbFolder.FACTORY_STATION, key)));
       } catch (err) {
         console.error('Failed to remove station', err);
       }
@@ -336,10 +337,10 @@ export class ViewSetupStation extends LitElement {
     try {
       if (this.editingKey) {
         // Edit Mode
-        await update(dbRef(db, `/data/${companyKey}/factoryData/station/${this.editingKey}`), payload);
+        await update(dbRef(db, getCompanyPath(companyKey, DbFolder.FACTORY_STATION, this.editingKey)), payload);
       } else {
         // Add Mode
-        const newStationRef = push(dbRef(db, `/data/${companyKey}/factoryData/station`));
+        const newStationRef = push(dbRef(db, getCompanyPath(companyKey, DbFolder.FACTORY_STATION)));
         await set(newStationRef, payload);
       }
       this.showEditor = false;
@@ -417,7 +418,7 @@ export class ViewSetupStation extends LitElement {
               <md-outlined-text-field 
                 label="Station Name" 
                 .value=${this.editName}
-                @input=${(e: any) => this.editName = e.target.value}
+                @input=${(e: Event) => this.editName = (e.target as HTMLInputElement).value}
                 required>
               </md-outlined-text-field>
 
@@ -425,7 +426,7 @@ export class ViewSetupStation extends LitElement {
                 label="Station Sequence Number" 
                 type="number"
                 .value=${this.editNumber.toString()}
-                @input=${(e: any) => this.editNumber = Number(e.target.value)}>
+                @input=${(e: Event) => this.editNumber = Number((e.target as HTMLInputElement).value)}>
               </md-outlined-text-field>
 
               <div class="machine-assignment-sec">
@@ -435,7 +436,7 @@ export class ViewSetupStation extends LitElement {
                     label="Select Machine" 
                     .value=${this.selectedMachineKeyToAssign}
                     style="flex: 1"
-                    @change=${(e: any) => this.selectedMachineKeyToAssign = e.target.value}>
+                    @change=${(e: Event) => this.selectedMachineKeyToAssign = (e.target as HTMLSelectElement).value}>
                     ${availableMachines.map(m => html`
                       <md-select-option value=${m.$key}>
                         <div slot="headline">#${m.number} - ${m.name}</div>

@@ -4,11 +4,20 @@ import { consume } from '@lit/context';
 import { ref as dbRef, push, set, remove, update } from 'firebase/database';
 import { db } from '../config/firebase.js';
 import { userContext, UserContextValue } from '../context/userContext.js';
-import { FirebaseQueryController } from '../controllers/FirebaseQueryController.js';
-import { FirebaseDocController } from '../controllers/FirebaseDocController.js';
 import { sortOrdersHeuristically, OrderItem as SchedOrderItem } from '../utils/scheduling.js';
 import { displayDateFromTimestamp, formatDurationHM, formatTimeOnly } from '../utils/date.js';
 import { columnBodyRenderer, columnHeaderRenderer } from '@vaadin/grid/lit.js';
+import {
+  ordersContext,
+  scheduleDataContext,
+  stationsContext,
+  scheduleConfigContext,
+  operationContext,
+  factoryProfileContext,
+  QueryContextValue,
+  DocContextValue
+} from '../context/dataContexts.js';
+import { DbFolder, getCompanyPath } from '../config/db-paths.js';
 
 // Material Design 3 & Vaadin Imports
 import '@material/web/button/filled-button.js';
@@ -272,30 +281,30 @@ export class ViewPlanScheduling extends LitElement {
 
   @state() private activeStationNumber: number | null = null;
 
-  // Real-time Queries
-  private orderQueryController = new FirebaseQueryController<OrderItem>(this, () =>
-    this.authState.profile?.key ? `/data/${this.authState.profile.key}/orderData` : null
-  );
+  // Consume shared global context providers (0 redundant Firebase network listeners!)
+  @consume({ context: ordersContext, subscribe: true })
+  @state()
+  private ordersState!: QueryContextValue<OrderItem>;
 
-  private scheduleQueryController = new FirebaseQueryController<ScheduleItem>(this, () =>
-    this.authState.profile?.key ? `/data/${this.authState.profile.key}/scheduleData` : null
-  );
+  @consume({ context: scheduleDataContext, subscribe: true })
+  @state()
+  private scheduleState!: QueryContextValue<ScheduleItem>;
 
-  private stationQueryController = new FirebaseQueryController<StationItem>(this, () =>
-    this.authState.profile?.key ? `/data/${this.authState.profile.key}/factoryData/station` : null
-  );
+  @consume({ context: stationsContext, subscribe: true })
+  @state()
+  private stationsState!: QueryContextValue<StationItem>;
 
-  private scheduleConfigController = new FirebaseDocController(this, () =>
-    this.authState.profile?.key ? `/data/${this.authState.profile.key}/factoryData/schedule` : null
-  );
+  @consume({ context: scheduleConfigContext, subscribe: true })
+  @state()
+  private scheduleConfigState!: DocContextValue;
 
-  private profileConfigController = new FirebaseDocController(this, () =>
-    this.authState.profile?.key ? `/data/${this.authState.profile.key}/factoryData/profile` : null
-  );
+  @consume({ context: operationContext, subscribe: true })
+  @state()
+  private operationConfigState!: DocContextValue;
 
-  private operationConfigController = new FirebaseDocController(this, () =>
-    this.authState.profile?.key ? `/data/${this.authState.profile.key}/factoryData/operation` : null
-  );
+  @consume({ context: factoryProfileContext, subscribe: true })
+  @state()
+  private profileConfigState!: DocContextValue;
 
   formatDuration(seconds: number): string {
     return formatDurationHM(seconds);
@@ -319,10 +328,10 @@ export class ViewPlanScheduling extends LitElement {
     const companyKey = this.authState.profile?.key;
     if (!companyKey) return;
 
-    const opConfig = this.operationConfigController.data;
-    const schedConfig = this.scheduleConfigController.data;
-    const profileModel = this.profileConfigController.data?.model || 'serial';
-    const concurrencyVal = parseInt(this.profileConfigController.data?.concurrency) || 1;
+    const opConfig = this.operationConfigState.data as any;
+    const schedConfig = this.scheduleConfigState.data as any;
+    const profileModel = (this.profileConfigState.data as any)?.model || 'serial';
+    const concurrencyVal = parseInt((this.profileConfigState.data as any)?.concurrency) || 1;
 
     if (!opConfig || !schedConfig) {
       alert('Operational configs missing. Please ensure shifts are set up under Factory Setup.');
@@ -335,10 +344,10 @@ export class ViewPlanScheduling extends LitElement {
 
     try {
       // 1. Clear active scheduling table
-      await remove(dbRef(db, `/data/${companyKey}/scheduleData`));
+      await remove(dbRef(db, getCompanyPath(companyKey, DbFolder.SCHEDULE_DATA)));
 
       // 2. Fetch the unsorted, active waiting orders
-      const orders = this.orderQueryController.data.filter(o => o.order_status !== 'done' && o.order_status !== 'cancel');
+      const orders = this.ordersState.data.filter((o: OrderItem) => o.order_status !== 'done' && o.order_status !== 'cancel');
       if (orders.length === 0) {
         alert('No pending or waiting orders to schedule!');
         return;
@@ -368,7 +377,7 @@ export class ViewPlanScheduling extends LitElement {
         const order = scheduledOrdersSet[i];
         
         // Mark order WIP
-        await update(dbRef(db, `/data/${companyKey}/orderData/${order.$key}`), { order_status: 'wip' });
+        await update(dbRef(db, getCompanyPath(companyKey, DbFolder.ORDER_DATA, order.$key)), { order_status: 'wip' });
 
         const parts = order.order_product_part || [];
 
@@ -391,7 +400,7 @@ export class ViewPlanScheduling extends LitElement {
             const itemWorkloadSeconds = setupTime + (cycleTime * targetQty);
 
             // Compute allocated machines (Scales duration down under station concurrent machinery)
-            const station = this.stationQueryController.data.find(s => s.st_number === stationNum);
+            const station = this.stationsState.data.find((s: StationItem) => s.st_number === stationNum);
             const machinesAvailable = station?.st_machine?.length || 1;
             const scaledDurationSeconds = Math.ceil(itemWorkloadSeconds / machinesAvailable);
 
@@ -426,14 +435,14 @@ export class ViewPlanScheduling extends LitElement {
       }
 
       // 6. Bulk push calculated jobs schedule straight to Firebase
-      const scheduleRef = dbRef(db, `/data/${companyKey}/scheduleData`);
+      const scheduleRef = dbRef(db, getCompanyPath(companyKey, DbFolder.SCHEDULE_DATA));
       for (const job of resultItems) {
         const ref = push(scheduleRef);
         await set(ref, job);
       }
 
       // 7. Write system logging notification
-      const notifyRef = push(dbRef(db, `/data/${companyKey}/notificationData`));
+      const notifyRef = push(dbRef(db, getCompanyPath(companyKey, DbFolder.NOTIFICATION_DATA)));
       await set(notifyRef, {
         created: Math.round(Date.now() / 1000),
         detail: `Successfully re-scheduled and dispatched ${scheduledOrdersSet.length} orders to shopfloor tracking.`,
@@ -452,7 +461,7 @@ export class ViewPlanScheduling extends LitElement {
 
     if (confirm('Are you sure you want to delete this order booking permanently?')) {
       try {
-        await remove(dbRef(db, `/data/${companyKey}/orderData/${key}`));
+        await remove(dbRef(db, getCompanyPath(companyKey, DbFolder.ORDER_DATA, key)));
       } catch (err) {
         console.error('Failed to remove order', err);
       }
@@ -465,7 +474,7 @@ export class ViewPlanScheduling extends LitElement {
 
     if (confirm('Are you sure you want to cancel this order booking? This will stop it from being scheduled.')) {
       try {
-        await update(dbRef(db, `/data/${companyKey}/orderData/${key}`), { order_status: 'cancel' });
+        await update(dbRef(db, getCompanyPath(companyKey, DbFolder.ORDER_DATA, key)), { order_status: 'cancel' });
       } catch (err) {
         console.error('Failed to cancel order', err);
       }
@@ -478,7 +487,7 @@ export class ViewPlanScheduling extends LitElement {
 
     if (confirm('Are you sure you want to cancel and delete this specific dispatched job from the active schedule timeline?')) {
       try {
-        await remove(dbRef(db, `/data/${companyKey}/scheduleData/${key}`));
+        await remove(dbRef(db, getCompanyPath(companyKey, DbFolder.SCHEDULE_DATA, key)));
       } catch (err) {
         console.error('Failed to cancel dispatched job', err);
       }
@@ -486,16 +495,16 @@ export class ViewPlanScheduling extends LitElement {
   }
 
   override render() {
-    if (this.orderQueryController.loading || this.scheduleQueryController.loading || this.stationQueryController.loading) {
+    if (this.ordersState.loading || this.scheduleState.loading || this.stationsState.loading) {
       return html`<p>Loading operational dispatch workspace...</p>`;
     }
 
-    const orders = this.orderQueryController.data;
-    const allJobs = this.scheduleQueryController.data;
-    const stations = this.stationQueryController.data;
+    const orders = this.ordersState.data;
+    const allJobs = this.scheduleState.data;
+    const stations = this.stationsState.data;
 
     // Filter jobs by activeStationNumber if selected
-    const activeJobs = allJobs.filter(j => {
+    const activeJobs = allJobs.filter((j: ScheduleItem) => {
       if (this.activeStationNumber === null) return true;
       if (Array.isArray(j.job_station)) {
         return j.job_station.includes(this.activeStationNumber);
@@ -503,13 +512,13 @@ export class ViewPlanScheduling extends LitElement {
       return j.job_station === this.activeStationNumber;
     });
 
-    const schedConfig = this.scheduleConfigController.data;
-    const profileConfig = this.profileConfigController.data;
+    const schedConfig = this.scheduleConfigState.data as any;
+    const profileConfig = this.profileConfigState.data as any;
 
     // Calculate Gantt overall range
     let minStart = Infinity;
     let maxEnd = -Infinity;
-    allJobs.forEach(job => {
+    allJobs.forEach((job: ScheduleItem) => {
       if (job.start < minStart) minStart = job.start;
       if (job.end > maxEnd) maxEnd = job.end;
     });
@@ -545,11 +554,11 @@ export class ViewPlanScheduling extends LitElement {
           </div>
           <div class="header-info-item">
             <span>Waiting bookings:</span>
-            <strong class="badge-waiting">${orders.filter(o => o.order_status === 'waiting').length}</strong>
+            <strong class="badge-waiting">${orders.filter((o: OrderItem) => o.order_status === 'waiting').length}</strong>
           </div>
           <div class="header-info-item">
             <span>Active WIP:</span>
-            <strong class="badge-wip">${orders.filter(o => o.order_status === 'wip').length}</strong>
+            <strong class="badge-wip">${orders.filter((o: OrderItem) => o.order_status === 'wip').length}</strong>
           </div>
         </div>
 
@@ -563,43 +572,43 @@ export class ViewPlanScheduling extends LitElement {
             <vaadin-grid-column
               flex="0.5"
               ${columnHeaderRenderer(() => html`Order No`, [])}
-              ${columnBodyRenderer((item: any) => html`#${item.order_no}`, [])}
+              ${columnBodyRenderer((item: OrderItem) => html`#${item.order_no}`, [])}
             ></vaadin-grid-column>
 
             <vaadin-grid-column
               flex="1.5"
               ${columnHeaderRenderer(() => html`Customer`, [])}
-              ${columnBodyRenderer((item: any) => html`${item.order_customer}`, [])}
+              ${columnBodyRenderer((item: OrderItem) => html`${item.order_customer}`, [])}
             ></vaadin-grid-column>
 
             <vaadin-grid-column
               flex="1.5"
               ${columnHeaderRenderer(() => html`Product`, [])}
-              ${columnBodyRenderer((item: any) => html`${item.order_product_name}`, [])}
+              ${columnBodyRenderer((item: OrderItem) => html`${item.order_product_name}`, [])}
             ></vaadin-grid-column>
 
             <vaadin-grid-column
               flex="0.8"
               ${columnHeaderRenderer(() => html`Qty`, [])}
-              ${columnBodyRenderer((item: any) => html`${item.order_quantity} units`, [])}
+              ${columnBodyRenderer((item: OrderItem) => html`${item.order_quantity} units`, [])}
             ></vaadin-grid-column>
 
             <vaadin-grid-column
               flex="1"
               ${columnHeaderRenderer(() => html`Est Duration`, [])}
-              ${columnBodyRenderer((item: any) => html`${this.formatDuration(item.order_duration)}`, [])}
+              ${columnBodyRenderer((item: OrderItem) => html`${this.formatDuration(item.order_duration)}`, [])}
             ></vaadin-grid-column>
 
             <vaadin-grid-column
               flex="1.2"
               ${columnHeaderRenderer(() => html`Delivery Target`, [])}
-              ${columnBodyRenderer((item: any) => html`${this.getFormattedDate(item.order_delivery)}`, [])}
+              ${columnBodyRenderer((item: OrderItem) => html`${this.getFormattedDate(item.order_delivery)}`, [])}
             ></vaadin-grid-column>
 
             <vaadin-grid-column
               flex="1"
               ${columnHeaderRenderer(() => html`Status`, [])}
-              ${columnBodyRenderer((item: any) => html`
+              ${columnBodyRenderer((item: OrderItem) => html`
                 <span class="badge-${item.order_status}">${item.order_status}</span>
               `, [])}
             ></vaadin-grid-column>
@@ -607,7 +616,7 @@ export class ViewPlanScheduling extends LitElement {
             <vaadin-grid-column
               flex="0.8"
               ${columnHeaderRenderer(() => html`Actions`, [])}
-              ${columnBodyRenderer((item: any) => html`
+              ${columnBodyRenderer((item: OrderItem) => html`
                 <div style="display:flex; gap: 8px; justify-content:flex-start; align-items:center;">
                   ${item.order_status !== 'cancel' && item.order_status !== 'done' ? html`
                     <button class="action-btn cancel-btn" @click=${() => this.cancelOrder(item.$key)} title="Cancel Booking (keeps history)">
@@ -644,7 +653,7 @@ export class ViewPlanScheduling extends LitElement {
                 @click=${() => this.activeStationNumber = null}>
                 All Stations
               </button>
-              ${stations.map(st => html`
+              ${stations.map((st: StationItem) => html`
                 <button 
                   class="station-btn ${this.activeStationNumber === st.st_number ? 'active' : ''}" 
                   @click=${() => this.activeStationNumber = st.st_number}>
@@ -658,43 +667,43 @@ export class ViewPlanScheduling extends LitElement {
             <vaadin-grid-column
               flex="0.5"
               ${columnHeaderRenderer(() => html`Order`, [])}
-              ${columnBodyRenderer((item: any) => html`#${item.order_no}`, [])}
+              ${columnBodyRenderer((item: ScheduleItem) => html`#${item.order_no}`, [])}
             ></vaadin-grid-column>
 
             <vaadin-grid-column
               flex="1.5"
               ${columnHeaderRenderer(() => html`Product Part`, [])}
-              ${columnBodyRenderer((item: any) => html`${item.job_part} (SKU: ${item.job_sku})`, [])}
+              ${columnBodyRenderer((item: ScheduleItem) => html`${item.job_part} (SKU: ${item.job_sku})`, [])}
             ></vaadin-grid-column>
 
             <vaadin-grid-column
               flex="0.8"
               ${columnHeaderRenderer(() => html`Quantity`, [])}
-              ${columnBodyRenderer((item: any) => html`${item.job_quantity} units`, [])}
+              ${columnBodyRenderer((item: ScheduleItem) => html`${item.job_quantity} units`, [])}
             ></vaadin-grid-column>
 
             <vaadin-grid-column
               flex="0.8"
               ${columnHeaderRenderer(() => html`Station`, [])}
-              ${columnBodyRenderer((item: any) => html`ST-${item.job_station}`, [])}
+              ${columnBodyRenderer((item: ScheduleItem) => html`ST-${item.job_station}`, [])}
             ></vaadin-grid-column>
 
             <vaadin-grid-column
               flex="1.2"
               ${columnHeaderRenderer(() => html`Estimate Start`, [])}
-              ${columnBodyRenderer((item: any) => html`${this.formatTime(item.start)}`, [])}
+              ${columnBodyRenderer((item: ScheduleItem) => html`${this.formatTime(item.start)}`, [])}
             ></vaadin-grid-column>
 
             <vaadin-grid-column
               flex="1.2"
               ${columnHeaderRenderer(() => html`Estimate End`, [])}
-              ${columnBodyRenderer((item: any) => html`${this.formatTime(item.end)}`, [])}
+              ${columnBodyRenderer((item: ScheduleItem) => html`${this.formatTime(item.end)}`, [])}
             ></vaadin-grid-column>
 
             <vaadin-grid-column
               flex="1"
               ${columnHeaderRenderer(() => html`Status`, [])}
-              ${columnBodyRenderer((item: any) => html`
+              ${columnBodyRenderer((item: ScheduleItem) => html`
                 <span class="badge-${item.job_status}">${item.job_status}</span>
               `, [])}
             ></vaadin-grid-column>
@@ -702,7 +711,7 @@ export class ViewPlanScheduling extends LitElement {
             <vaadin-grid-column
               flex="0.8"
               ${columnHeaderRenderer(() => html`Actions`, [])}
-              ${columnBodyRenderer((item: any) => html`
+              ${columnBodyRenderer((item: ScheduleItem) => html`
                 <div style="display:flex; gap: 8px; justify-content:flex-start; align-items:center;">
                   ${item.job_status === 'waiting' ? html`
                     <button class="action-btn delete-btn" @click=${() => this.cancelJob(item.$key)} title="Remove from Schedule">

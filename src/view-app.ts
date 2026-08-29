@@ -22,10 +22,12 @@ import {
   notificationsContext,
   warehouseContext,
   companyUsersContext,
+  scheduleDataContext,
   scheduleConfigContext,
   operationContext,
   performanceContext,
-  historyContext
+  historyContext,
+  factoryProfileContext
 } from './context/dataContexts.js';
 
 // Material Design 3 Imports
@@ -406,6 +408,10 @@ export class ViewApp extends LitElement {
     this.authState.profile?.key ? getCompanyPath(this.authState.profile.key, DbFolder.WAREHOUSE_DATA) : null
   );
 
+  private scheduleDataQueryController = new FirebaseQueryController(this, () =>
+    this.authState.profile?.key ? getCompanyPath(this.authState.profile.key, DbFolder.SCHEDULE_DATA) : null
+  );
+
   private companyUsersQueryController = new FirebaseQueryController(this, () =>
     this.authState.profile?.key ? getCompanyPath(this.authState.profile.key, DbFolder.USERS) : null
   );
@@ -421,6 +427,10 @@ export class ViewApp extends LitElement {
 
   private performanceController = new FirebaseDocController(this, () =>
     this.authState.profile?.key ? getCompanyPath(this.authState.profile.key, DbFolder.PERFORMANCE_DATA) : null
+  );
+
+  private factoryProfileController = new FirebaseDocController(this, () =>
+    this.authState.profile?.key ? getCompanyPath(this.authState.profile.key, DbFolder.FACTORY_PROFILE) : null
   );
 
   private historyController = new FirebaseDocController(this, () =>
@@ -443,10 +453,12 @@ export class ViewApp extends LitElement {
   private notificationsProvider = new ContextProvider(this, { context: notificationsContext, initialValue: { data: [], loading: true, error: null } });
   private warehouseProvider = new ContextProvider(this, { context: warehouseContext, initialValue: { data: [], loading: true, error: null } });
   private companyUsersProvider = new ContextProvider(this, { context: companyUsersContext, initialValue: { data: [], loading: true, error: null } });
+  private scheduleDataProvider = new ContextProvider(this, { context: scheduleDataContext, initialValue: { data: [], loading: true, error: null } });
 
   private scheduleProvider = new ContextProvider(this, { context: scheduleConfigContext, initialValue: { data: null, loading: true, error: null } });
   private operationProvider = new ContextProvider(this, { context: operationContext, initialValue: { data: null, loading: true, error: null } });
   private performanceProvider = new ContextProvider(this, { context: performanceContext, initialValue: { data: null, loading: true, error: null } });
+  private factoryProfileProvider = new ContextProvider(this, { context: factoryProfileContext, initialValue: { data: null, loading: true, error: null } });
   private historyProvider = new ContextProvider(this, { context: historyContext, initialValue: { data: null, loading: true, error: null } });
   private commitProvider = new ContextProvider(this, { context: commitContext, initialValue: { data: [], loading: true, error: null } });
 
@@ -465,12 +477,14 @@ export class ViewApp extends LitElement {
     this.notificationsProvider.setValue({ data: this.notificationsController.data, loading: this.notificationsController.loading, error: this.notificationsController.error });
     this.warehouseProvider.setValue({ data: this.warehouseController.data, loading: this.warehouseController.loading, error: this.warehouseController.error });
     this.companyUsersProvider.setValue({ data: this.companyUsersQueryController.data, loading: this.companyUsersQueryController.loading, error: this.companyUsersQueryController.error });
+    this.scheduleDataProvider.setValue({ data: this.scheduleDataQueryController.data, loading: this.scheduleDataQueryController.loading, error: this.scheduleDataQueryController.error });
     this.commitProvider.setValue({ data: this.commitController.data, loading: this.commitController.loading, error: this.commitController.error });
 
     // Sync active document controller states to context providers
     this.scheduleProvider.setValue({ data: this.scheduleController.data, loading: this.scheduleController.loading, error: this.scheduleController.error });
     this.operationProvider.setValue({ data: this.operationController.data, loading: this.operationController.loading, error: this.operationController.error });
     this.performanceProvider.setValue({ data: this.performanceController.data, loading: this.performanceController.loading, error: this.performanceController.error });
+    this.factoryProfileProvider.setValue({ data: this.factoryProfileController.data, loading: this.factoryProfileController.loading, error: this.factoryProfileController.error });
     this.historyProvider.setValue({ data: this.historyController.data, loading: this.historyController.loading, error: this.historyController.error });
   }
 

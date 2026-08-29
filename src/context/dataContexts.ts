@@ -31,9 +31,11 @@ export const commitContext = createContext<QueryContextValue>('commit-context');
 export const notificationsContext = createContext<QueryContextValue>('notifications-context');
 export const warehouseContext = createContext<QueryContextValue>('warehouse-context');
 export const companyUsersContext = createContext<QueryContextValue>('company-users-context');
+export const scheduleDataContext = createContext<QueryContextValue>('schedule-data-context');
 
 // Global real-time document contexts
 export const scheduleConfigContext = createContext<DocContextValue>('schedule-config-context');
 export const operationContext = createContext<DocContextValue>('operation-context');
 export const performanceContext = createContext<DocContextValue>('performance-context');
 export const historyContext = createContext<DocContextValue>('history-context');
+export const factoryProfileContext = createContext<DocContextValue>('factory-profile-context');
