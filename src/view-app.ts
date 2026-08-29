@@ -208,10 +208,12 @@ export class ViewApp extends LitElement {
       margin: 0;
       color: #202020;
     }
-    .user-version {
-      font-size: 0.75rem;
-      color: #888888;
+    .user-role {
+      font-size: 0.72rem;
+      color: #777;
       margin: 2px 0 0 0;
+      letter-spacing: 0.5px;
+      font-weight: 500;
     }
     .logout-btn {
       width: 100%;
@@ -612,7 +614,7 @@ export class ViewApp extends LitElement {
                 }} />
               <div class="user-details">
                 <p class="user-name">${profile?.displayname || 'User Profile'}</p>
-                <p class="user-version">Version 2.0.0</p>
+                <p class="user-role">${profile?.role ? profile.role.toUpperCase() : 'OPERATOR'}</p>
               </div>
             </div>
           </div>

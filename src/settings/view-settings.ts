@@ -6,6 +6,7 @@ import { updateProfile, updateEmail, updatePassword, sendEmailVerification, Emai
 import { db } from '../config/firebase.js';
 import { userContext, UserContextValue } from '../context/userContext.js';
 import { FirebaseDocController } from '../controllers/FirebaseDocController.js';
+import { FirebaseQueryController } from '../controllers/FirebaseQueryController.js';
 
 // Material Design 3 Imports
 import '@material/web/textfield/outlined-text-field.js';
@@ -209,9 +210,6 @@ export class ViewSettings extends LitElement {
   @state() private foundDevices: string[] = [];
   @state() private activeDevices: string[] = [];
 
-  // Manage Users dataset
-  @state() private companyUsers: Array<{ uid: string; displayname: string; email: string; role: string; photoURL: string | null }> = [];
-
   private _boundEscHandler = this._handleEscKey.bind(this);
 
   override connectedCallback() {
@@ -247,6 +245,11 @@ export class ViewSettings extends LitElement {
   // App Data customisations
   private appDataController = new FirebaseDocController(this, () =>
     this.authState.profile?.key ? `/data/${this.authState.profile.key}/appData` : null
+  );
+
+  // Auto-track company users in real-time to prevent solitary user profile deletion
+  private companyUsersQueryController = new FirebaseQueryController<any>(this, () =>
+    this.authState.profile?.key ? `/data/${this.authState.profile.key}/users` : null
   );
 
   override updated() {
@@ -586,24 +589,7 @@ export class ViewSettings extends LitElement {
   // --- 6. Organization Layout & Team Members ---
 
   private async openManageUsers() {
-    const companyKey = this.authState.profile?.key;
-    if (!companyKey) return;
-
-    try {
-      const snapshot = await get(dbRef(db, `/data/${companyKey}/users`));
-      if (snapshot.exists()) {
-        const data = snapshot.val();
-        this.companyUsers = Object.keys(data).map(uid => ({
-          uid,
-          ...data[uid]
-        }));
-      } else {
-        this.companyUsers = [];
-      }
-      this.showManageUsersDialog = true;
-    } catch (err: any) {
-      this.triggerError(`Failed to load company members: ${err.message}`);
-    }
+    this.showManageUsersDialog = true;
   }
 
   private async changeUserRole(uid: string, newRole: string) {
@@ -612,7 +598,6 @@ export class ViewSettings extends LitElement {
 
     try {
       await update(dbRef(db, `/data/${companyKey}/users/${uid}`), { role: newRole });
-      this.companyUsers = this.companyUsers.map(u => u.uid === uid ? { ...u, role: newRole } : u);
       this.triggerSuccess('User member role modified successfully.');
     } catch (err: any) {
       this.triggerError(err.message);
@@ -626,7 +611,6 @@ export class ViewSettings extends LitElement {
     if (confirm('Are you sure you want to remove this user from your company? They will lose access to all factory data.')) {
       try {
         await remove(dbRef(db, `/data/${companyKey}/users/${uid}`));
-        this.companyUsers = this.companyUsers.filter(u => u.uid !== uid);
         this.triggerSuccess('User successfully unlinked from company silo.');
       } catch (err: any) {
         this.triggerError(err.message);
@@ -789,8 +773,14 @@ export class ViewSettings extends LitElement {
 
           <md-filled-button class="btn-block" @click=${this.saveAccountSettings}>Save Account Details</md-filled-button>
           
-          <md-outlined-button class="btn-block" @click=${this.deleteAccount} style="--md-outlined-button-label-text-color: #c62828; --md-outlined-button-outline-color: #fde8e8;">
-            <md-icon slot="icon">no_accounts</md-icon> Delete User Profile
+          <md-outlined-button 
+            class="btn-block" 
+            @click=${this.deleteAccount} 
+            ?disabled=${this.companyUsersQueryController.data.length <= 1}
+            style="--md-outlined-button-label-text-color: #c62828; --md-outlined-button-outline-color: #fde8e8;"
+            title="${this.companyUsersQueryController.data.length <= 1 ? 'Cannot delete your profile as the sole remaining company user. Use Terminate Service instead.' : 'Delete your personal profile credentials'}">
+            <md-icon slot="icon">no_accounts</md-icon> 
+            ${this.companyUsersQueryController.data.length <= 1 ? 'Delete Profile (Sole User Protected)' : 'Delete User Profile'}
           </md-outlined-button>
         </div>
 
@@ -934,9 +924,9 @@ export class ViewSettings extends LitElement {
             <p style="font-size:0.85rem; color:#666; margin:0;">Below are the active registered accounts linked to your factory database keychain:</p>
 
             <div class="users-list">
-              ${this.companyUsers.length === 0 ? html`
+              ${this.companyUsersQueryController.data.length === 0 ? html`
                 <span style="font-style:italic; color:#888; text-align:center; padding:12px;">No unlinked members found. All users registered under this key automatically sync here.</span>
-              ` : this.companyUsers.map(u => html`
+              ` : this.companyUsersQueryController.data.map((u: any) => html`
                 <div class="user-list-item">
                   <div class="user-item-details">
                     <img 
