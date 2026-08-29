@@ -30,6 +30,11 @@ export class ViewDashboard extends LitElement {
       align-items: stretch;
       box-shadow: 0 2px 5px rgba(0,0,0,0.15);
       border-radius: 4px;
+      overflow-x: auto;
+      scrollbar-width: none;
+    }
+    .dashboard-tabs::-webkit-scrollbar {
+      display: none;
     }
     .tab-btn {
       padding: 0 24px;
