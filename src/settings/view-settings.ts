@@ -7,6 +7,7 @@ import { db } from '../config/firebase.js';
 import { userContext, UserContextValue } from '../context/userContext.js';
 import { FirebaseDocController } from '../controllers/FirebaseDocController.js';
 import { FirebaseQueryController } from '../controllers/FirebaseQueryController.js';
+import { DbFolder, getCompanyPath, getUserProfilePath } from '../config/db-paths.js';
 
 // Material Design 3 Imports
 import '@material/web/textfield/outlined-text-field.js';
@@ -244,12 +245,12 @@ export class ViewSettings extends LitElement {
 
   // App Data customisations
   private appDataController = new FirebaseDocController(this, () =>
-    this.authState.profile?.key ? `/data/${this.authState.profile.key}/appData` : null
+    this.authState.profile?.key ? getCompanyPath(this.authState.profile.key, DbFolder.APP_DATA) : null
   );
 
   // Auto-track company users in real-time to prevent solitary user profile deletion
   private companyUsersQueryController = new FirebaseQueryController<any>(this, () =>
-    this.authState.profile?.key ? `/data/${this.authState.profile.key}/users` : null
+    this.authState.profile?.key ? getCompanyPath(this.authState.profile.key, DbFolder.USERS) : null
   );
 
   override updated() {
@@ -321,7 +322,7 @@ export class ViewSettings extends LitElement {
     const isChecked = e.target.checked;
 
     try {
-      await set(dbRef(db, `/data/${companyKey}/appData/material_count`), isChecked);
+      await set(dbRef(db, getCompanyPath(companyKey, DbFolder.APP_DATA, 'material_count')), isChecked);
       this.triggerSuccess(`Raw materials calculation successfully ${isChecked ? 'enabled' : 'disabled'}.`);
     } catch (err: any) {
       this.triggerError(err.message);
@@ -334,7 +335,7 @@ export class ViewSettings extends LitElement {
 
     if (confirm('WARNING: Are you sure you want to reset the factory order sequence tracker index count back to 1?')) {
       try {
-        await set(dbRef(db, `/data/${companyKey}/factoryData/order/order_count`), 1);
+        await set(dbRef(db, getCompanyPath(companyKey, DbFolder.FACTORY_ORDER, 'order_count')), 1);
         this.triggerSuccess('Sequence tracker index reset to 1.');
       } catch (err: any) {
         this.triggerError(err.message);
@@ -369,7 +370,7 @@ export class ViewSettings extends LitElement {
       const base64Url = reader.result as string;
       try {
         await updateProfile(user, { photoURL: base64Url });
-        const userProfileRef = dbRef(db, `/user/${user.uid}`);
+        const userProfileRef = dbRef(db, getUserProfilePath(user.uid));
         await update(userProfileRef, { photoURL: base64Url });
         this.triggerSuccess('Profile image updated successfully.');
       } catch (err: any) {
@@ -386,7 +387,7 @@ export class ViewSettings extends LitElement {
     if (confirm('Are you sure you want to remove your profile image?')) {
       try {
         await updateProfile(user, { photoURL: '' });
-        const userProfileRef = dbRef(db, `/user/${user.uid}`);
+        const userProfileRef = dbRef(db, getUserProfilePath(user.uid));
         await update(userProfileRef, { photoURL: null });
         this.triggerSuccess('Profile image removed successfully.');
       } catch (err: any) {
@@ -412,10 +413,10 @@ export class ViewSettings extends LitElement {
         await reauthenticateWithCredential(user, credential);
 
         // 1. Remove this user from the company members list
-        await remove(dbRef(db, `/data/${companyKey}/users/${user.uid}`));
+        await remove(dbRef(db, getCompanyPath(companyKey, DbFolder.USERS, user.uid)));
 
         // 2. Wipe the personal user routing profile references
-        await remove(dbRef(db, `/user/${user.uid}`));
+        await remove(dbRef(db, getUserProfilePath(user.uid)));
 
         // 3. Delete the authentication credentials from Firebase
         await deleteUser(user);
@@ -435,7 +436,7 @@ export class ViewSettings extends LitElement {
     try {
       if (this.editDisplayName !== user.displayName) {
         await updateProfile(user, { displayName: this.editDisplayName });
-        const userProfileRef = dbRef(db, `/user/${user.uid}`);
+        const userProfileRef = dbRef(db, getUserProfilePath(user.uid));
         await update(userProfileRef, { displayname: this.editDisplayName });
       }
       this.triggerSuccess('User profile name successfully updated.');
@@ -460,7 +461,7 @@ export class ViewSettings extends LitElement {
       await reauthenticateWithCredential(user, credential);
 
       await updateEmail(user, this.editEmail);
-      const userProfileRef = dbRef(db, `/user/${user.uid}`);
+      const userProfileRef = dbRef(db, getUserProfilePath(user.uid));
       await update(userProfileRef, { email: this.editEmail });
 
       this.editCurrentPassword = '';
@@ -566,7 +567,7 @@ export class ViewSettings extends LitElement {
     const isChecked = e.target.checked;
 
     try {
-      await set(dbRef(db, `/data/${companyKey}/appData/notification`), isChecked);
+      await set(dbRef(db, getCompanyPath(companyKey, DbFolder.APP_DATA, 'notification')), isChecked);
       this.triggerSuccess(`Web push alerts ${isChecked ? 'enabled' : 'disabled'}.`);
     } catch (err: any) {
       this.triggerError(err.message);
@@ -579,7 +580,7 @@ export class ViewSettings extends LitElement {
     const isChecked = e.target.checked;
 
     try {
-      await set(dbRef(db, `/data/${companyKey}/appData/email_alert`), isChecked);
+      await set(dbRef(db, getCompanyPath(companyKey, DbFolder.APP_DATA, 'email_alert')), isChecked);
       this.triggerSuccess(`Critical email alerts ${isChecked ? 'enabled' : 'disabled'}.`);
     } catch (err: any) {
       this.triggerError(err.message);
@@ -597,7 +598,7 @@ export class ViewSettings extends LitElement {
     if (!companyKey) return;
 
     try {
-      await update(dbRef(db, `/data/${companyKey}/users/${uid}`), { role: newRole });
+      await update(dbRef(db, getCompanyPath(companyKey, DbFolder.USERS, uid)), { role: newRole });
       this.triggerSuccess('User member role modified successfully.');
     } catch (err: any) {
       this.triggerError(err.message);
@@ -610,7 +611,7 @@ export class ViewSettings extends LitElement {
 
     if (confirm('Are you sure you want to remove this user from your company? They will lose access to all factory data.')) {
       try {
-        await remove(dbRef(db, `/data/${companyKey}/users/${uid}`));
+        await remove(dbRef(db, getCompanyPath(companyKey, DbFolder.USERS, uid)));
         this.triggerSuccess('User successfully unlinked from company silo.');
       } catch (err: any) {
         this.triggerError(err.message);
@@ -628,13 +629,13 @@ export class ViewSettings extends LitElement {
     if (!user || !this.newKeychainKey) return;
 
     try {
-      const testSnapshot = await get(dbRef(db, `/data/${this.newKeychainKey}/factoryData`));
+      const testSnapshot = await get(dbRef(db, getCompanyPath(this.newKeychainKey, DbFolder.FACTORY_PROFILE)));
       if (!testSnapshot.exists()) {
         alert('Keychain Error: Target keychain references an empty or invalid company profile.');
         return;
       }
 
-      const userProfileRef = dbRef(db, `/user/${user.uid}`);
+      const userProfileRef = dbRef(db, getUserProfilePath(user.uid));
       await update(userProfileRef, { key: this.newKeychainKey });
       
       this.showKeychainDialog = false;
@@ -651,7 +652,7 @@ export class ViewSettings extends LitElement {
     if (!user || !profile) return;
 
     try {
-      const userProfileRef = dbRef(db, `/user/${user.uid}`);
+      const userProfileRef = dbRef(db, getUserProfilePath(user.uid));
       await update(userProfileRef, {
         company: this.editCompany
       });
@@ -696,7 +697,7 @@ export class ViewSettings extends LitElement {
       await remove(dbRef(db, `/data/${companyKey}`));
 
       // 2. Erase user's own profile and company routing references
-      await remove(dbRef(db, `/user/${user.uid}`));
+      await remove(dbRef(db, getUserProfilePath(user.uid)));
 
       // 3. Delete the user from authentication credentials
       await deleteUser(user);
