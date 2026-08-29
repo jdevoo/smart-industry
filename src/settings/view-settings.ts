@@ -397,10 +397,10 @@ export class ViewSettings extends LitElement {
     const companyKey = this.authState.profile?.key;
     if (!user || !companyKey) return;
 
-    if (confirm('DANGER: Delete this account? Your factory workspace and personal profiles will be permanently erased. This is irreversible.')) {
-      const password = prompt("To confirm account deletion, please enter your current password:");
+    if (confirm('Are you sure you want to delete your personal profile and account credentials? This will not affect the shared company factory data if other members exist.')) {
+      const password = prompt("To confirm profile deletion, please enter your current password:");
       if (!password) {
-        alert('Password verification canceled. Account deletion aborted.');
+        alert('Password verification canceled. Profile deletion aborted.');
         return;
       }
 
@@ -408,17 +408,19 @@ export class ViewSettings extends LitElement {
         const credential = EmailAuthProvider.credential(user.email || '', password);
         await reauthenticateWithCredential(user, credential);
 
-        // Wipe Database references
-        await remove(dbRef(db, `/data/${companyKey}`));
+        // 1. Remove this user from the company members list
+        await remove(dbRef(db, `/data/${companyKey}/users/${user.uid}`));
+
+        // 2. Wipe the personal user routing profile references
         await remove(dbRef(db, `/user/${user.uid}`));
 
-        // Delete Auth User
+        // 3. Delete the authentication credentials from Firebase
         await deleteUser(user);
 
-        alert('Account and company silo successfully deleted.');
+        alert('Your personal profile account was successfully deleted.');
         window.location.reload();
       } catch (err: any) {
-        alert(`Account deletion failed: ${err.message}`);
+        alert(`Profile deletion failed: ${err.message}`);
       }
     }
   }
@@ -675,6 +677,53 @@ export class ViewSettings extends LitElement {
     }
   }
 
+  private async terminateServiceAndWipeWorkspace() {
+    const user = this.authState.user;
+    const profile = this.authState.profile;
+    const companyKey = profile?.key;
+    if (!user || !profile || !companyKey) return;
+
+    if (profile.role !== 'admin') {
+      alert('Unauthorized: Only factory Administrators can terminate services and wipe workspaces.');
+      return;
+    }
+
+    if (!confirm('🚨 CRITICAL WARNING 🚨\n\nThis will PERMANENTLY ERASE the entire corporate factory workspace database for ALL users. All products, machines, orders, and material histories will be vaporized. This action is irreversible.\n\nAre you absolutely sure you want to proceed?')) {
+      return;
+    }
+
+    const doubleCheck = prompt('To confirm service termination, please type your active factory Key / Company ID Key:');
+    if (doubleCheck !== companyKey) {
+      alert('Verification failed. Workspace deletion aborted.');
+      return;
+    }
+
+    const password = prompt("To execute the final database purge, please enter your password:");
+    if (!password) {
+      alert('Re-authentication canceled. Purge aborted.');
+      return;
+    }
+
+    try {
+      const credential = EmailAuthProvider.credential(user.email || '', password);
+      await reauthenticateWithCredential(user, credential);
+
+      // 1. Wipe the central corporate factory data workspace entirely
+      await remove(dbRef(db, `/data/${companyKey}`));
+
+      // 2. Erase user's own profile and company routing references
+      await remove(dbRef(db, `/user/${user.uid}`));
+
+      // 3. Delete the user from authentication credentials
+      await deleteUser(user);
+
+      alert('All factory databases and company subscriptions have been permanently purged. Service terminated.');
+      window.location.reload();
+    } catch (err: any) {
+      alert(`Service termination failed: ${err.message}`);
+    }
+  }
+
   override render() {
     const user = this.authState.user;
     const profile = this.authState.profile;
@@ -741,7 +790,7 @@ export class ViewSettings extends LitElement {
           <md-filled-button class="btn-block" @click=${this.saveAccountSettings}>Save Account Details</md-filled-button>
           
           <md-outlined-button class="btn-block" @click=${this.deleteAccount} style="--md-outlined-button-label-text-color: #c62828; --md-outlined-button-outline-color: #fde8e8;">
-            <md-icon slot="icon">delete_forever</md-icon> Delete Account
+            <md-icon slot="icon">no_accounts</md-icon> Delete User Profile
           </md-outlined-button>
         </div>
 
@@ -841,6 +890,15 @@ export class ViewSettings extends LitElement {
           <md-outlined-button class="btn-block" @click=${this.openKeychainEditor}>Manage Keychain</md-outlined-button>
           <md-outlined-button class="btn-block" @click=${this.openManageUsers}>Manage Users</md-outlined-button>
           <md-filled-button class="btn-block" @click=${this.saveOrganizationSettings}>Save Organization Settings</md-filled-button>
+
+          ${profile?.role === 'admin' ? html`
+            <md-outlined-button 
+              class="btn-block" 
+              @click=${this.terminateServiceAndWipeWorkspace} 
+              style="--md-outlined-button-label-text-color: #c62828; --md-outlined-button-outline-color: #fde8e8; margin-top: 12px;">
+              <md-icon slot="icon">delete_forever</md-icon> Terminate Service & Wipe Data
+            </md-outlined-button>
+          ` : ''}
         </div>
       </div>
 
