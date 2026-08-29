@@ -6,6 +6,22 @@ import { onAuthStateChanged, signOut } from 'firebase/auth';
 import { ref, onValue, update } from 'firebase/database';
 import { auth, db } from './config/firebase.js';
 import { userContext, UserContextValue, UserProfile } from './context/userContext.js';
+import { FirebaseQueryController } from './controllers/FirebaseQueryController.js';
+import { FirebaseDocController } from './controllers/FirebaseDocController.js';
+import { DbFolder, getCompanyPath } from './config/db-paths.js';
+import {
+  ordersContext,
+  machinesContext,
+  stationsContext,
+  productsContext,
+  customersContext,
+  inventoryContext,
+  devicesContext,
+  jobsContext,
+  scheduleConfigContext,
+  operationContext,
+  performanceContext
+} from './context/dataContexts.js';
 
 // Material Design 3 Imports
 import '@material/web/iconbutton/icon-button.js';
@@ -343,6 +359,85 @@ export class ViewApp extends LitElement {
     context: userContext,
     initialValue: this.authState
   });
+
+  // Global Real-time Firebase Queries (instantiated ONCE at the parent level)
+  private ordersController = new FirebaseQueryController(this, () =>
+    this.authState.profile?.key ? getCompanyPath(this.authState.profile.key, DbFolder.ORDER_DATA) : null
+  );
+
+  private machinesController = new FirebaseQueryController(this, () =>
+    this.authState.profile?.key ? getCompanyPath(this.authState.profile.key, DbFolder.FACTORY_MACHINE) : null
+  );
+
+  private stationsController = new FirebaseQueryController(this, () =>
+    this.authState.profile?.key ? getCompanyPath(this.authState.profile.key, DbFolder.FACTORY_STATION) : null
+  );
+
+  private productsController = new FirebaseQueryController(this, () =>
+    this.authState.profile?.key ? getCompanyPath(this.authState.profile.key, DbFolder.FACTORY_PRODUCT) : null
+  );
+
+  private customersController = new FirebaseQueryController(this, () =>
+    this.authState.profile?.key ? getCompanyPath(this.authState.profile.key, DbFolder.FACTORY_CUSTOMER) : null
+  );
+
+  private inventoryController = new FirebaseQueryController(this, () =>
+    this.authState.profile?.key ? getCompanyPath(this.authState.profile.key, DbFolder.FACTORY_INVENTORY) : null
+  );
+
+  private devicesController = new FirebaseQueryController(this, () =>
+    this.authState.profile?.key ? getCompanyPath(this.authState.profile.key, DbFolder.FACTORY_DEVICE) : null
+  );
+
+  private jobsController = new FirebaseQueryController(this, () =>
+    this.authState.profile?.key ? getCompanyPath(this.authState.profile.key, DbFolder.TRACKING_DATA) : null
+  );
+
+  // Global Real-time Firebase Documents
+  private scheduleController = new FirebaseDocController(this, () =>
+    this.authState.profile?.key ? getCompanyPath(this.authState.profile.key, DbFolder.FACTORY_SCHEDULE) : null
+  );
+
+  private operationController = new FirebaseDocController(this, () =>
+    this.authState.profile?.key ? getCompanyPath(this.authState.profile.key, DbFolder.FACTORY_OPERATION) : null
+  );
+
+  private performanceController = new FirebaseDocController(this, () =>
+    this.authState.profile?.key ? getCompanyPath(this.authState.profile.key, DbFolder.PERFORMANCE_DATA) : null
+  );
+
+  // Global Context Providers to expose reactive states down the DOM tree
+  private ordersProvider = new ContextProvider(this, { context: ordersContext, initialValue: { data: [], loading: true, error: null } });
+  private machinesProvider = new ContextProvider(this, { context: machinesContext, initialValue: { data: [], loading: true, error: null } });
+  private stationsProvider = new ContextProvider(this, { context: stationsContext, initialValue: { data: [], loading: true, error: null } });
+  private productsProvider = new ContextProvider(this, { context: productsContext, initialValue: { data: [], loading: true, error: null } });
+  private customersProvider = new ContextProvider(this, { context: customersContext, initialValue: { data: [], loading: true, error: null } });
+  private inventoryProvider = new ContextProvider(this, { context: inventoryContext, initialValue: { data: [], loading: true, error: null } });
+  private devicesProvider = new ContextProvider(this, { context: devicesContext, initialValue: { data: [], loading: true, error: null } });
+  private jobsProvider = new ContextProvider(this, { context: jobsContext, initialValue: { data: [], loading: true, error: null } });
+
+  private scheduleProvider = new ContextProvider(this, { context: scheduleConfigContext, initialValue: { data: null, loading: true, error: null } });
+  private operationProvider = new ContextProvider(this, { context: operationContext, initialValue: { data: null, loading: true, error: null } });
+  private performanceProvider = new ContextProvider(this, { context: performanceContext, initialValue: { data: null, loading: true, error: null } });
+
+  override updated(changedProperties: Map<string, any>) {
+    super.updated(changedProperties);
+
+    // Sync active query controller states to context providers
+    this.ordersProvider.setValue({ data: this.ordersController.data, loading: this.ordersController.loading, error: this.ordersController.error });
+    this.machinesProvider.setValue({ data: this.machinesController.data, loading: this.machinesController.loading, error: this.machinesController.error });
+    this.stationsProvider.setValue({ data: this.stationsController.data, loading: this.stationsController.loading, error: this.stationsController.error });
+    this.productsProvider.setValue({ data: this.productsController.data, loading: this.productsController.loading, error: this.productsController.error });
+    this.customersProvider.setValue({ data: this.customersController.data, loading: this.customersController.loading, error: this.customersController.error });
+    this.inventoryProvider.setValue({ data: this.inventoryController.data, loading: this.inventoryController.loading, error: this.inventoryController.error });
+    this.devicesProvider.setValue({ data: this.devicesController.data, loading: this.devicesController.loading, error: this.devicesController.error });
+    this.jobsProvider.setValue({ data: this.jobsController.data, loading: this.jobsController.loading, error: this.jobsController.error });
+
+    // Sync active document controller states to context providers
+    this.scheduleProvider.setValue({ data: this.scheduleController.data, loading: this.scheduleController.loading, error: this.scheduleController.error });
+    this.operationProvider.setValue({ data: this.operationController.data, loading: this.operationController.loading, error: this.operationController.error });
+    this.performanceProvider.setValue({ data: this.performanceController.data, loading: this.performanceController.loading, error: this.performanceController.error });
+  }
 
   private router!: Router;
   private profileUnsubscribe: (() => void) | null = null;

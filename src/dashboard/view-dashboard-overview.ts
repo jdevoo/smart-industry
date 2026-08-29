@@ -4,9 +4,18 @@ import { consume } from '@lit/context';
 import { ref as dbRef, update } from 'firebase/database';
 import { db } from '../config/firebase.js';
 import { userContext, UserContextValue } from '../context/userContext.js';
-import { FirebaseQueryController } from '../controllers/FirebaseQueryController.js';
-import { FirebaseDocController } from '../controllers/FirebaseDocController.js';
 import { displayDateFromTimestamp } from '../utils/date.js';
+import {
+  ordersContext,
+  machinesContext,
+  stationsContext,
+  productsContext,
+  scheduleConfigContext,
+  operationContext,
+  performanceContext,
+  QueryContextValue,
+  DocContextValue
+} from '../context/dataContexts.js';
 
 @customElement('view-dashboard-overview')
 export class ViewDashboardOverview extends LitElement {
@@ -137,34 +146,34 @@ export class ViewDashboardOverview extends LitElement {
 
   @state() private remainOpTime = 'Checking Shift...';
 
-  // Subscriptions
-  private ordersController = new FirebaseQueryController(this, () =>
-    this.authState.profile?.key ? `/data/${this.authState.profile.key}/orderData` : null
-  );
+  // Exclusively consume our shared global context providers (0 redundant Firebase network listeners!)
+  @consume({ context: ordersContext, subscribe: true })
+  @state()
+  private ordersState!: QueryContextValue;
 
-  private machinesController = new FirebaseQueryController(this, () =>
-    this.authState.profile?.key ? `/data/${this.authState.profile.key}/factoryData/machine` : null
-  );
+  @consume({ context: machinesContext, subscribe: true })
+  @state()
+  private machinesState!: QueryContextValue;
 
-  private stationsController = new FirebaseQueryController(this, () =>
-    this.authState.profile?.key ? `/data/${this.authState.profile.key}/factoryData/station` : null
-  );
+  @consume({ context: stationsContext, subscribe: true })
+  @state()
+  private stationsState!: QueryContextValue;
 
-  private scheduleController = new FirebaseDocController(this, () =>
-    this.authState.profile?.key ? `/data/${this.authState.profile.key}/factoryData/schedule` : null
-  );
+  @consume({ context: scheduleConfigContext, subscribe: true })
+  @state()
+  private scheduleState!: DocContextValue;
 
-  private operationController = new FirebaseDocController(this, () =>
-    this.authState.profile?.key ? `/data/${this.authState.profile.key}/factoryData/operation` : null
-  );
+  @consume({ context: operationContext, subscribe: true })
+  @state()
+  private operationState!: DocContextValue;
 
-  private performanceController = new FirebaseDocController(this, () =>
-    this.authState.profile?.key ? `/data/${this.authState.profile.key}/performanceData` : null
-  );
+  @consume({ context: performanceContext, subscribe: true })
+  @state()
+  private performanceState!: DocContextValue;
 
-  private productsController = new FirebaseQueryController(this, () =>
-    this.authState.profile?.key ? `/data/${this.authState.profile.key}/factoryData/product` : null
-  );
+  @consume({ context: productsContext, subscribe: true })
+  @state()
+  private productsState!: QueryContextValue;
 
   private _isResettingInterval = false;
 
@@ -175,7 +184,7 @@ export class ViewDashboardOverview extends LitElement {
   }
 
   private checkIntervalAndReset() {
-    const sched = this.scheduleController.data;
+    const sched = this.scheduleState.data;
     const companyKey = this.authState.profile?.key;
     if (!sched || !companyKey || !sched.interval || !sched.start_interval) return;
 
@@ -204,10 +213,10 @@ export class ViewDashboardOverview extends LitElement {
     const uid = this.authState.user?.uid;
     if (!profile || !uid || profile.setup) return;
 
-    const hasMachines = this.machinesController.data.length > 0;
-    const hasStations = this.stationsController.data.length > 0;
-    const hasProducts = this.productsController.data.length > 0;
-    const hasOperation = this.operationController.data && this.operationController.data.production_model;
+    const hasMachines = this.machinesState.data.length > 0;
+    const hasStations = this.stationsState.data.length > 0;
+    const hasProducts = this.productsState.data.length > 0;
+    const hasOperation = this.operationState.data && this.operationState.data.production_model;
 
     if (hasMachines && hasStations && hasProducts && hasOperation) {
       try {
@@ -219,7 +228,7 @@ export class ViewDashboardOverview extends LitElement {
   }
 
   private calculateRemainOpTime() {
-    const op = this.operationController.data;
+    const op = this.operationState.data;
     if (!op || !op.op_end || !op.op_start || !op.op_day) {
       this.remainOpTime = 'No Operation Day';
       return;
@@ -263,22 +272,22 @@ export class ViewDashboardOverview extends LitElement {
   }
 
   override render() {
-    if (this.ordersController.loading || this.machinesController.loading || this.stationsController.loading || this.productsController.loading) {
+    if (this.ordersState.loading || this.machinesState.loading || this.stationsState.loading || this.productsState.loading) {
       return html`<p>Loading operational dashboard metrics...</p>`;
     }
 
-    const orders = this.ordersController.data;
-    const waitCount = orders.filter(o => o.order_status === 'waiting').length;
-    const wipCount = orders.filter(o => o.order_status === 'wip').length;
-    const doneCount = orders.filter(o => o.order_status === 'done').length;
+    const orders = this.ordersState.data;
+    const waitCount = orders.filter((o: any) => o.order_status === 'waiting').length;
+    const wipCount = orders.filter((o: any) => o.order_status === 'wip').length;
+    const doneCount = orders.filter((o: any) => o.order_status === 'done').length;
 
-    const oee = this.performanceController.data?.oee || 95; // default to 95 if not loaded as shown in original
-    const sched = this.scheduleController.data;
+    const oee = this.performanceState.data?.oee || 95; // default to 95 if not loaded as shown in original
+    const sched = this.scheduleState.data;
 
-    const hasMachines = this.machinesController.data.length > 0;
-    const hasStations = this.stationsController.data.length > 0;
-    const hasProducts = this.productsController.data.length > 0;
-    const hasOperation = this.operationController.data && this.operationController.data.production_model;
+    const hasMachines = this.machinesState.data.length > 0;
+    const hasStations = this.stationsState.data.length > 0;
+    const hasProducts = this.productsState.data.length > 0;
+    const hasOperation = this.operationState.data && this.operationState.data.production_model;
 
     return html`
       <!-- New User Checklist Alert -->
@@ -292,19 +301,19 @@ export class ViewDashboardOverview extends LitElement {
               <span class="material-symbols-outlined" style="font-size: 18px; margin-right: 4px;">
                 ${hasMachines ? 'check_circle' : 'pending'}
               </span>
-              Register your Machinery (${this.machinesController.data.length} registered)
+              Register your Machinery (${this.machinesState.data.length} registered)
             </li>
             <li class="${hasStations ? 'checked' : 'pending'}">
               <span class="material-symbols-outlined" style="font-size: 18px; margin-right: 4px;">
                 ${hasStations ? 'check_circle' : 'pending'}
               </span>
-              Configure assembly Work Stations (${this.stationsController.data.length} configured)
+              Configure assembly Work Stations (${this.stationsState.data.length} configured)
             </li>
             <li class="${hasProducts ? 'checked' : 'pending'}">
               <span class="material-symbols-outlined" style="font-size: 18px; margin-right: 4px;">
                 ${hasProducts ? 'check_circle' : 'pending'}
               </span>
-              Define your Products & Part sequences (${this.productsController.data.length} defined)
+              Define your Products & Part sequences (${this.productsState.data.length} defined)
             </li>
             <li class="${hasOperation ? 'checked' : 'pending'}">
               <span class="material-symbols-outlined" style="font-size: 18px; margin-right: 4px;">
@@ -341,12 +350,12 @@ export class ViewDashboardOverview extends LitElement {
 
         <div class="kpi-card">
           <h4 class="kpi-title">Working machines</h4>
-          <p class="kpi-value">${this.machinesController.data.length}</p>
+          <p class="kpi-value">${this.machinesState.data.length}</p>
         </div>
 
         <div class="kpi-card">
           <h4 class="kpi-title">Working stations</h4>
-          <p class="kpi-value">${this.stationsController.data.length}</p>
+          <p class="kpi-value">${this.stationsState.data.length}</p>
         </div>
 
         <div class="kpi-card">
