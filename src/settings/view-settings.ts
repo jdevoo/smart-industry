@@ -244,10 +244,6 @@ export class ViewSettings extends LitElement {
   @state() private editNewPassword = '';
   @state() private editCompany = '';
 
-  // Alert labels
-  @state() private successMsg = '';
-  @state() private errorMsg = '';
-
   // App Data customisations
   private appDataController = new FirebaseDocController(this, () =>
     this.authState.profile?.key ? `/data/${this.authState.profile.key}/appData` : null
@@ -267,15 +263,11 @@ export class ViewSettings extends LitElement {
   }
 
   private triggerSuccess(msg: string) {
-    this.errorMsg = '';
-    this.successMsg = msg;
-    setTimeout(() => this.successMsg = '', 5000);
+    alert(msg);
   }
 
   private triggerError(msg: string) {
-    this.successMsg = '';
-    this.errorMsg = msg;
-    setTimeout(() => this.errorMsg = '', 6000);
+    alert(msg);
   }
 
   // --- 1. General Settings (Sensors and Language) ---
@@ -690,11 +682,6 @@ export class ViewSettings extends LitElement {
     const avatarUrl = user?.photoURL || '/images/profile/icon-512x512.png';
 
     return html`
-      <div style="display:flex; flex-direction:column; gap:16px; margin-bottom: 24px;">
-        ${this.successMsg ? html`<div class="status-alert alert-success">${this.successMsg}</div>` : ''}
-        ${this.errorMsg ? html`<div class="status-alert alert-error">${this.errorMsg}</div>` : ''}
-      </div>
-
       <div class="settings-grid">
         <!-- 1. General Settings -->
         <div class="settings-card">
