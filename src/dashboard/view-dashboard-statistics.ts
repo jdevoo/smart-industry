@@ -4,9 +4,8 @@ import { consume } from '@lit/context';
 import { ref as dbRef, set, remove } from 'firebase/database';
 import { db } from '../config/firebase.js';
 import { userContext, UserContextValue } from '../context/userContext.js';
-import { FirebaseDocController } from '../controllers/FirebaseDocController.js';
-import { FirebaseQueryController } from '../controllers/FirebaseQueryController.js';
 import { isLeapYear, dateFromDays } from '../utils/date.js';
+import { historyContext, commitContext, QueryContextValue, DocContextValue } from '../context/dataContexts.js';
 
 interface ArchivedOrderItem {
   order_product?: string;
@@ -187,23 +186,22 @@ export class ViewDashboardStatistics extends LitElement {
 
   private chart: Chart | null = null;
 
-  // Real-time Queries
-  private historyController = new FirebaseDocController(this, () =>
-    this.authState.profile?.key ? `/data/${this.authState.profile.key}/historyData` : null
-  );
+  @consume({ context: historyContext, subscribe: true })
+  @state()
+  private historyState!: DocContextValue;
 
-  private commitController = new FirebaseQueryController<CommitItem>(this, () =>
-    this.authState.profile?.key ? `/data/${this.authState.profile.key}/commitData` : null
-  );
+  @consume({ context: commitContext, subscribe: true })
+  @state()
+  private commitState!: QueryContextValue<CommitItem>;
 
   override updated() {
-    if (this.historyController.data && !this.historyController.loading) {
+    if (this.historyState.data && !this.historyState.loading) {
       this.renderChart();
     }
   }
 
   private renderChart() {
-    const ordersObj = this.historyController.data?.order;
+    const ordersObj = this.historyState.data?.order;
     if (!ordersObj || !this.canvas) return;
 
     const ordersArr = Object.values(ordersObj) as unknown as ArchivedOrderItem[];
@@ -293,7 +291,7 @@ export class ViewDashboardStatistics extends LitElement {
   }
 
   override render() {
-    const commits = this.commitController.data;
+    const commits = this.commitState.data;
 
     return html`
       <div class="stats-layout">

@@ -4,7 +4,7 @@ import { consume } from '@lit/context';
 import { ref as dbRef, remove } from 'firebase/database';
 import { db } from '../config/firebase.js';
 import { userContext, UserContextValue } from '../context/userContext.js';
-import { FirebaseQueryController } from '../controllers/FirebaseQueryController.js';
+import { notificationsContext, QueryContextValue } from '../context/dataContexts.js';
 import { columnBodyRenderer, columnHeaderRenderer } from '@vaadin/grid/lit.js';
 
 // Material Design 3 Imports
@@ -97,9 +97,9 @@ export class ViewDashboardNotification extends LitElement {
   @state() private filterSeverity = 'default';
   @state() private filterDate = '';
 
-  private notificationsController = new FirebaseQueryController<NotificationItem>(this, () =>
-    this.authState.profile?.key ? `/data/${this.authState.profile.key}/notificationData` : null
-  );
+  @consume({ context: notificationsContext, subscribe: true })
+  @state()
+  private notificationsState!: QueryContextValue<NotificationItem>;
 
   override connectedCallback() {
     super.connectedCallback();
@@ -145,11 +145,11 @@ export class ViewDashboardNotification extends LitElement {
   }
 
   override render() {
-    if (this.notificationsController.loading) {
+    if (this.notificationsState.loading) {
       return html`<p>Loading Notification logs...</p>`;
     }
 
-    const filteredList = this.getFilteredNotifications(this.notificationsController.data);
+    const filteredList = this.getFilteredNotifications(this.notificationsState.data);
 
     return html`
       <div class="notification-pane">

@@ -4,8 +4,14 @@ import { consume } from '@lit/context';
 import { ref as dbRef, push, set, remove, update, get } from 'firebase/database';
 import { db } from '../config/firebase.js';
 import { userContext, UserContextValue } from '../context/userContext.js';
-import { FirebaseQueryController } from '../controllers/FirebaseQueryController.js';
 import { formatTimeAndDate, formatDurationHMS, displayDateFromTimestamp } from '../utils/date.js';
+import {
+  jobsContext,
+  devicesContext,
+  stationsContext,
+  machinesContext,
+  QueryContextValue
+} from '../context/dataContexts.js';
 
 // Material Design 3 Imports
 import '@material/web/button/filled-button.js';
@@ -314,27 +320,27 @@ export class ViewTrackProduction extends LitElement {
     }
   }
 
-  // Queries
-  private jobsQueryController = new FirebaseQueryController<WIPJobItem>(this, () =>
-    this.authState.profile?.key ? `/data/${this.authState.profile.key}/trackingData` : null
-  );
+  // Consume shared global context providers (0 redundant Firebase network listeners!)
+  @consume({ context: jobsContext, subscribe: true })
+  @state()
+  private jobsState!: QueryContextValue<WIPJobItem>;
 
-  private devicesQueryController = new FirebaseQueryController<DeviceItem>(this, () =>
-    this.authState.profile?.key ? `/data/${this.authState.profile.key}/factoryData/device` : null
-  );
+  @consume({ context: devicesContext, subscribe: true })
+  @state()
+  private devicesState!: QueryContextValue<DeviceItem>;
 
-  private stationsQueryController = new FirebaseQueryController<StationItem>(this, () =>
-    this.authState.profile?.key ? `/data/${this.authState.profile.key}/factoryData/station` : null
-  );
+  @consume({ context: stationsContext, subscribe: true })
+  @state()
+  private stationsState!: QueryContextValue<StationItem>;
 
-  private machinesQueryController = new FirebaseQueryController<MachineItem>(this, () =>
-    this.authState.profile?.key ? `/data/${this.authState.profile.key}/factoryData/machine` : null
-  );
+  @consume({ context: machinesContext, subscribe: true })
+  @state()
+  private machinesState!: QueryContextValue<MachineItem>;
 
   // Monitor pulse counts from bound devices to trigger auto-completion
   override updated() {
-    const jobs = this.jobsQueryController.data;
-    const devices = this.devicesQueryController.data;
+    const jobs = this.jobsState.data;
+    const devices = this.devicesState.data;
     const companyKey = this.authState.profile?.key;
 
     if (!companyKey || jobs.length === 0 || devices.length === 0) return;
@@ -582,19 +588,19 @@ export class ViewTrackProduction extends LitElement {
   }
 
   override render() {
-    if (this.jobsQueryController.loading || this.devicesQueryController.loading || this.stationsQueryController.loading || this.machinesQueryController.loading) {
+    if (this.jobsState.loading || this.devicesState.loading || this.stationsState.loading || this.machinesState.loading) {
       return html`<p>Establishing live shopfloor monitors connection...</p>`;
     }
 
-    const stations = this.stationsQueryController.data;
-    const activeJobs = this.jobsQueryController.data.filter(j => {
+    const stations = this.stationsState.data;
+    const activeJobs = this.jobsState.data.filter(j => {
       if (Array.isArray(j.job_station)) {
         return j.job_station.includes(this.activeStationNumber);
       }
       return j.job_station === this.activeStationNumber;
     });
-    const devices = this.devicesQueryController.data;
-    const machines = this.machinesQueryController.data || [];
+    const devices = this.devicesState.data;
+    const machines = this.machinesState.data || [];
 
     return html`
       <div class="track-grid">

@@ -18,9 +18,14 @@ import {
   inventoryContext,
   devicesContext,
   jobsContext,
+  commitContext,
+  notificationsContext,
+  warehouseContext,
+  companyUsersContext,
   scheduleConfigContext,
   operationContext,
-  performanceContext
+  performanceContext,
+  historyContext
 } from './context/dataContexts.js';
 
 // Material Design 3 Imports
@@ -393,6 +398,18 @@ export class ViewApp extends LitElement {
     this.authState.profile?.key ? getCompanyPath(this.authState.profile.key, DbFolder.TRACKING_DATA) : null
   );
 
+  private notificationsController = new FirebaseQueryController(this, () =>
+    this.authState.profile?.key ? getCompanyPath(this.authState.profile.key, DbFolder.NOTIFICATION_DATA) : null
+  );
+
+  private warehouseController = new FirebaseQueryController(this, () =>
+    this.authState.profile?.key ? getCompanyPath(this.authState.profile.key, DbFolder.WAREHOUSE_DATA) : null
+  );
+
+  private companyUsersQueryController = new FirebaseQueryController(this, () =>
+    this.authState.profile?.key ? getCompanyPath(this.authState.profile.key, DbFolder.USERS) : null
+  );
+
   // Global Real-time Firebase Documents
   private scheduleController = new FirebaseDocController(this, () =>
     this.authState.profile?.key ? getCompanyPath(this.authState.profile.key, DbFolder.FACTORY_SCHEDULE) : null
@@ -406,6 +423,14 @@ export class ViewApp extends LitElement {
     this.authState.profile?.key ? getCompanyPath(this.authState.profile.key, DbFolder.PERFORMANCE_DATA) : null
   );
 
+  private historyController = new FirebaseDocController(this, () =>
+    this.authState.profile?.key ? getCompanyPath(this.authState.profile.key, DbFolder.HISTORY_DATA) : null
+  );
+
+  private commitController = new FirebaseQueryController(this, () =>
+    this.authState.profile?.key ? getCompanyPath(this.authState.profile.key, DbFolder.COMMIT_DATA) : null
+  );
+
   // Global Context Providers to expose reactive states down the DOM tree
   private ordersProvider = new ContextProvider(this, { context: ordersContext, initialValue: { data: [], loading: true, error: null } });
   private machinesProvider = new ContextProvider(this, { context: machinesContext, initialValue: { data: [], loading: true, error: null } });
@@ -415,10 +440,15 @@ export class ViewApp extends LitElement {
   private inventoryProvider = new ContextProvider(this, { context: inventoryContext, initialValue: { data: [], loading: true, error: null } });
   private devicesProvider = new ContextProvider(this, { context: devicesContext, initialValue: { data: [], loading: true, error: null } });
   private jobsProvider = new ContextProvider(this, { context: jobsContext, initialValue: { data: [], loading: true, error: null } });
+  private notificationsProvider = new ContextProvider(this, { context: notificationsContext, initialValue: { data: [], loading: true, error: null } });
+  private warehouseProvider = new ContextProvider(this, { context: warehouseContext, initialValue: { data: [], loading: true, error: null } });
+  private companyUsersProvider = new ContextProvider(this, { context: companyUsersContext, initialValue: { data: [], loading: true, error: null } });
 
   private scheduleProvider = new ContextProvider(this, { context: scheduleConfigContext, initialValue: { data: null, loading: true, error: null } });
   private operationProvider = new ContextProvider(this, { context: operationContext, initialValue: { data: null, loading: true, error: null } });
   private performanceProvider = new ContextProvider(this, { context: performanceContext, initialValue: { data: null, loading: true, error: null } });
+  private historyProvider = new ContextProvider(this, { context: historyContext, initialValue: { data: null, loading: true, error: null } });
+  private commitProvider = new ContextProvider(this, { context: commitContext, initialValue: { data: [], loading: true, error: null } });
 
   override updated(changedProperties: Map<string, any>) {
     super.updated(changedProperties);
@@ -432,11 +462,16 @@ export class ViewApp extends LitElement {
     this.inventoryProvider.setValue({ data: this.inventoryController.data, loading: this.inventoryController.loading, error: this.inventoryController.error });
     this.devicesProvider.setValue({ data: this.devicesController.data, loading: this.devicesController.loading, error: this.devicesController.error });
     this.jobsProvider.setValue({ data: this.jobsController.data, loading: this.jobsController.loading, error: this.jobsController.error });
+    this.notificationsProvider.setValue({ data: this.notificationsController.data, loading: this.notificationsController.loading, error: this.notificationsController.error });
+    this.warehouseProvider.setValue({ data: this.warehouseController.data, loading: this.warehouseController.loading, error: this.warehouseController.error });
+    this.companyUsersProvider.setValue({ data: this.companyUsersQueryController.data, loading: this.companyUsersQueryController.loading, error: this.companyUsersQueryController.error });
+    this.commitProvider.setValue({ data: this.commitController.data, loading: this.commitController.loading, error: this.commitController.error });
 
     // Sync active document controller states to context providers
     this.scheduleProvider.setValue({ data: this.scheduleController.data, loading: this.scheduleController.loading, error: this.scheduleController.error });
     this.operationProvider.setValue({ data: this.operationController.data, loading: this.operationController.loading, error: this.operationController.error });
     this.performanceProvider.setValue({ data: this.performanceController.data, loading: this.performanceController.loading, error: this.performanceController.error });
+    this.historyProvider.setValue({ data: this.historyController.data, loading: this.historyController.loading, error: this.historyController.error });
   }
 
   private router!: Router;

@@ -8,6 +8,7 @@ export enum DbFolder {
   USERS = 'users',
   ORDER_DATA = 'orderData',
   HISTORY_DATA = 'historyData',
+  COMMIT_DATA = 'commitData',
   NOTIFICATION_DATA = 'notificationData',
   TRACKING_DATA = 'trackingData',
   WAREHOUSE_DATA = 'warehouseData',
