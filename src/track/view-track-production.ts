@@ -368,7 +368,7 @@ export class ViewTrackProduction extends LitElement {
       // 2. Increment overall daily workspace completed contribution index
       const commitSnapshot = await get(dbRef(db, `/data/${companyKey}/commitData`));
       if (commitSnapshot.exists()) {
-        const commits = commitSnapshot.val() as any[];
+        const commits = commitSnapshot.val() as unknown as Array<{ date: string; commit: number; level: number }>;
         const todayDateStr = displayDateFromTimestamp(timestamp * 1000);
         const targetDayIdx = commits.findIndex(c => c.date === todayDateStr);
         if (targetDayIdx !== -1) {
@@ -433,7 +433,7 @@ export class ViewTrackProduction extends LitElement {
       // 2. Increment contribution calendar tally
       const commitSnapshot = await get(dbRef(db, `/data/${companyKey}/commitData`));
       if (commitSnapshot.exists()) {
-        const commits = commitSnapshot.val() as any[];
+        const commits = commitSnapshot.val() as unknown as Array<{ date: string; commit: number; level: number }>;
         const todayDateStr = displayDateFromTimestamp(timestamp * 1000);
         const targetDayIdx = commits.findIndex(c => c.date === todayDateStr);
         if (targetDayIdx !== -1) {

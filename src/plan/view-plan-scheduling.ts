@@ -6,7 +6,7 @@ import { db } from '../config/firebase.js';
 import { userContext, UserContextValue } from '../context/userContext.js';
 import { FirebaseQueryController } from '../controllers/FirebaseQueryController.js';
 import { FirebaseDocController } from '../controllers/FirebaseDocController.js';
-import { sortOrdersHeuristically } from '../utils/scheduling.js';
+import { sortOrdersHeuristically, OrderItem as SchedOrderItem } from '../utils/scheduling.js';
 import { displayDateFromTimestamp, formatDurationHM, formatTimeOnly } from '../utils/date.js';
 import { columnBodyRenderer, columnHeaderRenderer } from '@vaadin/grid/lit.js';
 
@@ -345,7 +345,7 @@ export class ViewPlanScheduling extends LitElement {
       }
 
       // 3. Sort orders based on EDD (Earliest Due Date) + SPT (Shortest Processing Time) heuristics
-      const sortedOrders = sortOrdersHeuristically(orders as any) as unknown as OrderItem[];
+      const sortedOrders = sortOrdersHeuristically(orders as unknown as SchedOrderItem[]) as unknown as OrderItem[];
 
       // 4. Copy the concurrent orders list matching parallel capacities
       const limit = (profileModel === 'parallel') ? concurrencyVal : 1;

@@ -8,6 +8,13 @@ import { FirebaseDocController } from '../controllers/FirebaseDocController.js';
 import { FirebaseQueryController } from '../controllers/FirebaseQueryController.js';
 import { isLeapYear, dateFromDays } from '../utils/date.js';
 
+interface ArchivedOrderItem {
+  order_product?: string;
+  product_color?: string;
+  order_color?: string;
+  order_quantity?: number;
+}
+
 // Material Design 3 Button Imports
 import '@material/web/button/outlined-button.js';
 
@@ -199,7 +206,7 @@ export class ViewDashboardStatistics extends LitElement {
     const ordersObj = this.historyController.data?.order;
     if (!ordersObj || !this.canvas) return;
 
-    const ordersArr = Object.values(ordersObj) as any[];
+    const ordersArr = Object.values(ordersObj) as unknown as ArchivedOrderItem[];
     
     // Group and aggregate total orders count by Product Name
     const productCounts: { [name: string]: { qty: number, color: string } } = {};

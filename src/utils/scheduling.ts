@@ -6,9 +6,17 @@
 export interface OrderItem {
   $key?: string;
   order_no: number;
-  order_delivery: number; // Timestamp in seconds
+  order_customer?: string;
+  order_product_name?: string;
+  order_product_description?: string;
+  order_product_part?: any[];
+  order_product_sku?: string;
+  order_quantity?: number;
   order_duration: number; // Estimated processing time in minutes
+  order_delivery: number; // Timestamp in seconds
   order_status: 'waiting' | 'wip' | 'done' | 'late' | 'cancel';
+  order_color?: string;
+  order_date?: number;
 }
 
 /**
