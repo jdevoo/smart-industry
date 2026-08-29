@@ -5,6 +5,7 @@ import { ref as dbRef, push, set, remove, update } from 'firebase/database';
 import { db } from '../config/firebase.js';
 import { userContext, UserContextValue } from '../context/userContext.js';
 import { FirebaseQueryController } from '../controllers/FirebaseQueryController.js';
+import { DbFolder, getCompanyPath } from '../config/db-paths.js';
 
 // Material Design 3 UI Imports
 import '@material/web/textfield/outlined-text-field.js';
@@ -237,7 +238,7 @@ export class ViewSetupInventory extends LitElement {
 
   // Real-time Queries
   private inventoryController = new FirebaseQueryController<InventoryItem>(this, () =>
-    this.authState.profile?.key ? `/data/${this.authState.profile.key}/factoryData/inventory` : null
+    this.authState.profile?.key ? getCompanyPath(this.authState.profile.key, DbFolder.FACTORY_INVENTORY) : null
   );
 
   private openAddDialog() {
@@ -264,7 +265,7 @@ export class ViewSetupInventory extends LitElement {
 
     if (confirm('Are you sure you want to delete this stock/raw-material inventory item?')) {
       try {
-        await remove(dbRef(db, `/data/${companyKey}/factoryData/inventory/${key}`));
+        await remove(dbRef(db, getCompanyPath(companyKey, DbFolder.FACTORY_INVENTORY, key)));
       } catch (err) {
         console.error('Failed to remove inventory item', err);
       }
@@ -293,10 +294,10 @@ export class ViewSetupInventory extends LitElement {
     try {
       if (this.editingKey) {
         // Edit Mode
-        await update(dbRef(db, `/data/${companyKey}/factoryData/inventory/${this.editingKey}`), payload);
+        await update(dbRef(db, getCompanyPath(companyKey, DbFolder.FACTORY_INVENTORY, this.editingKey)), payload);
       } else {
         // Add Mode
-        const newRef = push(dbRef(db, `/data/${companyKey}/factoryData/inventory`));
+        const newRef = push(dbRef(db, getCompanyPath(companyKey, DbFolder.FACTORY_INVENTORY)));
         await set(newRef, {
           ...payload,
           add: timestamp
@@ -307,7 +308,7 @@ export class ViewSetupInventory extends LitElement {
       const quantityNum = Number(this.editQuantity);
       if (quantityNum <= 0) {
         // Critical Alert
-        const alertRef = push(dbRef(db, `/data/${companyKey}/notificationData`));
+        const alertRef = push(dbRef(db, getCompanyPath(companyKey, DbFolder.NOTIFICATION_DATA)));
         await set(alertRef, {
           created: timestamp,
           detail: `Critical stock alarm: Inventory code "${payload.code}" is completely out of stock.`,
@@ -315,7 +316,7 @@ export class ViewSetupInventory extends LitElement {
         });
       } else if (quantityNum < 30) {
         // Low Stock Alert
-        const alertRef = push(dbRef(db, `/data/${companyKey}/notificationData`));
+        const alertRef = push(dbRef(db, getCompanyPath(companyKey, DbFolder.NOTIFICATION_DATA)));
         await set(alertRef, {
           created: timestamp,
           detail: `Stock warning: Inventory code "${payload.code}" is running low (${quantityNum} units remaining).`,
@@ -419,14 +420,14 @@ export class ViewSetupInventory extends LitElement {
               <md-outlined-text-field 
                 label="Material / Part Name" 
                 .value=${this.editName}
-                @input=${(e: any) => this.editName = e.target.value}
+                @input=${(e: Event) => this.editName = (e.target as HTMLInputElement).value}
                 required>
               </md-outlined-text-field>
 
               <md-outlined-text-field 
                 label="Part Code / SKU" 
                 .value=${this.editCode}
-                @input=${(e: any) => this.editCode = e.target.value}
+                @input=${(e: Event) => this.editCode = (e.target as HTMLInputElement).value}
                 required>
               </md-outlined-text-field>
 
@@ -435,14 +436,14 @@ export class ViewSetupInventory extends LitElement {
                 type="number"
                 step="0.01"
                 .value=${this.editCost.toString()}
-                @input=${(e: any) => this.editCost = Number(e.target.value)}>
+                @input=${(e: Event) => this.editCost = Number((e.target as HTMLInputElement).value)}>
               </md-outlined-text-field>
 
               <md-outlined-text-field 
                 label="Current Stock Quantity" 
                 type="number"
                 .value=${this.editQuantity.toString()}
-                @input=${(e: any) => this.editQuantity = Number(e.target.value)}>
+                @input=${(e: Event) => this.editQuantity = Number((e.target as HTMLInputElement).value)}>
               </md-outlined-text-field>
             </div>
 
