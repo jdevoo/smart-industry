@@ -8,6 +8,7 @@ import { FirebaseQueryController } from '../controllers/FirebaseQueryController.
 import { FirebaseDocController } from '../controllers/FirebaseDocController.js';
 import { calculateRequiredActualQuantity, calculateOperationDuration } from '../utils/scheduling.js';
 import { formatDurationHMS } from '../utils/date.js';
+import { DbFolder, getCompanyPath } from '../config/db-paths.js';
 
 // Material Design 3 Imports
 import '@material/web/textfield/outlined-text-field.js';
@@ -184,23 +185,23 @@ export class ViewPlanOrder extends LitElement {
 
   // Real-time Queries
   private customerController = new FirebaseQueryController<CustomerItem>(this, () =>
-    this.authState.profile?.key ? `/data/${this.authState.profile.key}/factoryData/customer` : null
+    this.authState.profile?.key ? getCompanyPath(this.authState.profile.key, DbFolder.FACTORY_CUSTOMER) : null
   );
 
   private productController = new FirebaseQueryController<ProductItem>(this, () =>
-    this.authState.profile?.key ? `/data/${this.authState.profile.key}/factoryData/product` : null
+    this.authState.profile?.key ? getCompanyPath(this.authState.profile.key, DbFolder.FACTORY_PRODUCT) : null
   );
 
   private orderIndexController = new FirebaseDocController(this, () =>
-    this.authState.profile?.key ? `/data/${this.authState.profile.key}/factoryData/order` : null
+    this.authState.profile?.key ? getCompanyPath(this.authState.profile.key, DbFolder.FACTORY_ORDER) : null
   );
 
   private performanceController = new FirebaseDocController(this, () =>
-    this.authState.profile?.key ? `/data/${this.authState.profile.key}/factoryData/performance` : null
+    this.authState.profile?.key ? getCompanyPath(this.authState.profile.key, DbFolder.FACTORY_PERFORMANCE) : null
   );
 
   private appDataController = new FirebaseDocController(this, () =>
-    this.authState.profile?.key ? `/data/${this.authState.profile.key}/appData` : null
+    this.authState.profile?.key ? getCompanyPath(this.authState.profile.key, DbFolder.APP_DATA) : null
   );
 
   override connectedCallback() {
@@ -287,12 +288,12 @@ export class ViewPlanOrder extends LitElement {
 
     try {
       // 1. Write order details to the active booking queue
-      const ordersRef = dbRef(db, `/data/${companyKey}/orderData`);
+      const ordersRef = dbRef(db, getCompanyPath(companyKey, DbFolder.ORDER_DATA));
       const newOrderRef = push(ordersRef);
       await set(newOrderRef, orderPayload);
 
       // 2. Log order to historical archives
-      const historyRef = push(dbRef(db, `/data/${companyKey}/historyData/order`));
+      const historyRef = push(dbRef(db, getCompanyPath(companyKey, DbFolder.HISTORY_DATA, 'order')));
       await set(historyRef, {
         order_date: timestamp,
         order_delivery: deliveryTimestamp,
@@ -310,7 +311,7 @@ export class ViewPlanOrder extends LitElement {
         const requiredAmount = actualQty * parseFloat(product.inventory_use);
         
         // Query current inventory stock amount
-        const inventoryRef = dbRef(db, `/data/${companyKey}/factoryData/inventory`);
+        const inventoryRef = dbRef(db, getCompanyPath(companyKey, DbFolder.FACTORY_INVENTORY));
         const snapshot = await get(inventoryRef);
         if (snapshot.exists()) {
           const invList = snapshot.val();
@@ -318,13 +319,13 @@ export class ViewPlanOrder extends LitElement {
           if (targetKey) {
             const originalQty = parseFloat(invList[targetKey].quantity) || 0;
             const updatedQty = Math.max(0, originalQty - requiredAmount);
-            await update(dbRef(db, `/data/${companyKey}/factoryData/inventory/${targetKey}`), {
+            await update(dbRef(db, getCompanyPath(companyKey, DbFolder.FACTORY_INVENTORY, targetKey)), {
               quantity: updatedQty
             });
 
             // Write warning if raw stock is empty
             if (originalQty < requiredAmount) {
-              const notificationsRef = push(dbRef(db, `/data/${companyKey}/notificationData`));
+              const notificationsRef = push(dbRef(db, getCompanyPath(companyKey, DbFolder.NOTIFICATION_DATA)));
               await set(notificationsRef, {
                 created: timestamp,
                 detail: `Inventory item ${materialCode} is out of stock! Needed ${requiredAmount}, had ${originalQty}.`,
@@ -336,10 +337,10 @@ export class ViewPlanOrder extends LitElement {
       }
 
       // 4. Update overall order indexing count
-      await set(dbRef(db, `/data/${companyKey}/factoryData/order/order_count`), this.nextOrderNo + 1);
+      await set(dbRef(db, getCompanyPath(companyKey, DbFolder.FACTORY_ORDER, 'order_count')), this.nextOrderNo + 1);
 
       // 5. System alert
-      const notificationsRef = push(dbRef(db, `/data/${companyKey}/notificationData`));
+      const notificationsRef = push(dbRef(db, getCompanyPath(companyKey, DbFolder.NOTIFICATION_DATA)));
       await set(notificationsRef, {
         created: timestamp,
         detail: `Successfully booked order No. ${this.nextOrderNo} for ${customer.name}`,
@@ -389,7 +390,7 @@ export class ViewPlanOrder extends LitElement {
             <md-outlined-select 
               label="Select Customer" 
               .value=${this.selectedCustomerKey}
-              @change=${(e: any) => this.selectedCustomerKey = e.target.value}>
+              @change=${(e: Event) => this.selectedCustomerKey = (e.target as HTMLSelectElement).value}>
               ${customers.map(c => html`
                 <md-select-option value=${c.$key}>
                   <div slot="headline">${c.name}</div>
@@ -400,7 +401,7 @@ export class ViewPlanOrder extends LitElement {
             <md-outlined-select 
               label="Select Product SKU" 
               .value=${this.selectedProductKey}
-              @change=${(e: any) => this.selectedProductKey = e.target.value}>
+              @change=${(e: Event) => this.selectedProductKey = (e.target as HTMLSelectElement).value}>
               ${products.map(p => html`
                 <md-select-option value=${p.$key}>
                   <div slot="headline">${p.name} (SKU: ${p.sku})</div>
@@ -413,7 +414,7 @@ export class ViewPlanOrder extends LitElement {
               type="number" 
               min="1"
               .value=${this.orderQuantity.toString()}
-              @input=${(e: any) => this.orderQuantity = Number(e.target.value)}>
+              @input=${(e: Event) => this.orderQuantity = Number((e.target as HTMLInputElement).value)}>
             </md-outlined-text-field>
 
             <div class="date-input-container">
@@ -422,7 +423,7 @@ export class ViewPlanOrder extends LitElement {
                 type="date" 
                 class="date-input"
                 .value=${this.deliveryDate}
-                @input=${(e: any) => this.deliveryDate = e.target.value}/>
+                @input=${(e: Event) => this.deliveryDate = (e.target as HTMLInputElement).value}/>
             </div>
           </div>
 
