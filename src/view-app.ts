@@ -9,6 +9,15 @@ import { userContext, UserContextValue, UserProfile } from './context/userContex
 import { FirebaseQueryController } from './controllers/FirebaseQueryController.js';
 import { FirebaseDocController } from './controllers/FirebaseDocController.js';
 import { DbFolder, getCompanyPath, getUserProfilePath } from './config/db-paths.js';
+
+// Top-level route view imports for instant, delay-free navigation
+import './view-login.js';
+import './dashboard/view-dashboard.js';
+import './setup/view-setup.js';
+import './plan/view-plan.js';
+import './track/view-track.js';
+import './settings/view-settings.js';
+
 import {
   ordersContext,
   machinesContext,
@@ -603,16 +612,14 @@ export class ViewApp extends LitElement {
       {
         path: '/login',
         component: 'view-login',
-        action: async () => {
-          await import('./view-login.js');
+        action: () => {
           this.activeRoute = 'login';
         }
       },
       {
         path: '/app/dashboard',
         component: 'view-dashboard',
-        action: async () => {
-          await import('./dashboard/view-dashboard.js');
+        action: () => {
           this.activeRoute = 'dashboard';
           this.headerTitle = 'Overview Dashboard';
         }
@@ -620,8 +627,7 @@ export class ViewApp extends LitElement {
       {
         path: '/app/setup',
         component: 'view-setup',
-        action: async () => {
-          await import('./setup/view-setup.js');
+        action: () => {
           this.activeRoute = 'setup';
           this.headerTitle = 'Setup';
         }
@@ -629,8 +635,7 @@ export class ViewApp extends LitElement {
       {
         path: '/app/plan',
         component: 'view-plan',
-        action: async () => {
-          await import('./plan/view-plan.js');
+        action: () => {
           this.activeRoute = 'plan';
           this.headerTitle = 'Plan';
         }
@@ -638,8 +643,7 @@ export class ViewApp extends LitElement {
       {
         path: '/app/track',
         component: 'view-track',
-        action: async () => {
-          await import('./track/view-track.js');
+        action: () => {
           this.activeRoute = 'track';
           this.headerTitle = 'Track';
         }
@@ -647,8 +651,7 @@ export class ViewApp extends LitElement {
       {
         path: '/app/settings',
         component: 'view-settings',
-        action: async () => {
-          await import('./settings/view-settings.js');
+        action: () => {
           this.activeRoute = 'settings';
           this.headerTitle = 'Settings';
         }

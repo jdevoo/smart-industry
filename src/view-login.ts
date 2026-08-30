@@ -122,6 +122,19 @@ export class ViewLogin extends LitElement {
   @state() private company = '';
   @state() private phone = '';
 
+  private _handleKeyDown(e: KeyboardEvent) {
+    if (e.key === 'Enter') {
+      e.preventDefault();
+      if (this.currentForm === 'login') {
+        this.login();
+      } else if (this.currentForm === 'register') {
+        this.register();
+      } else if (this.currentForm === 'reset') {
+        this.resetPassword();
+      }
+    }
+  }
+
   private _handleLoginSubmit(e: Event) {
     e.preventDefault();
     this.login();
@@ -260,7 +273,7 @@ export class ViewLogin extends LitElement {
 
   private renderLoginForm() {
     return html`
-      <form @submit=${this._handleLoginSubmit}>
+      <form @submit=${this._handleLoginSubmit} @keydown=${this._handleKeyDown}>
         <div class="form-title">
           <h2>User Login</h2>
         </div>
@@ -299,7 +312,7 @@ export class ViewLogin extends LitElement {
 
   private renderRegisterForm() {
     return html`
-      <form @submit=${this._handleRegisterSubmit}>
+      <form @submit=${this._handleRegisterSubmit} @keydown=${this._handleKeyDown}>
         <div class="form-title">
           <h2>Register Company</h2>
         </div>
@@ -342,7 +355,7 @@ export class ViewLogin extends LitElement {
 
   private renderResetForm() {
     return html`
-      <form @submit=${this._handleResetSubmit}>
+      <form @submit=${this._handleResetSubmit} @keydown=${this._handleKeyDown}>
         <div class="form-title">
           <h2>Reset your password</h2>
           <p>Enter the email you used to signup with and we'll send you a link to reset your password.</p>
