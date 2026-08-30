@@ -287,10 +287,10 @@ export function scheduleOrdersFiniteCapacity(
       const partSetups = part.setup || [];
       const partCycles = part.cycle || [];
 
-      // If this part depends on a prerequisite part SKU, wait for that prerequisite part to complete
+      // If this part depends on a prerequisite part SKU, wait for that prerequisite part to complete (+ inter-station transfer delay)
       let prerequisiteEndTime = initialStartTimestamp;
       if (part.dependency && partEndTimes.has(part.dependency)) {
-        prerequisiteEndTime = partEndTimes.get(part.dependency)!;
+        prerequisiteEndTime = partEndTimes.get(part.dependency)! + delaySeconds;
       }
 
       let partPreviousStepEndTime = prerequisiteEndTime;

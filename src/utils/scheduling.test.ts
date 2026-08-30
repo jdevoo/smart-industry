@@ -153,6 +153,108 @@ describe('JobShop Scheduling Heuristics & Optimization', () => {
     });
   });
 
+  describe('Three Production Scheduling Models (Serial, Parallel, Multi-Component)', () => {
+
+    it('1. Serial Production Model: limits selection to 1 order and dispatches sequentially', () => {
+      const stations: StationItem[] = [
+        { st_number: 1, st_name: 'Station 1', st_machine: [{ mid: 'm1', name: 'Machine 1', number: 1 }] }
+      ];
+
+      const orders: OrderItem[] = [
+        { $key: 'ord1', order_no: 101, order_quantity: 10, order_delivery: 1000, order_duration: 20, order_status: 'waiting', order_product_part: [{ name: 'P1', sku: 'S1', process: [1], setup: [60], cycle: [10] }] },
+        { $key: 'ord2', order_no: 102, order_quantity: 10, order_delivery: 1050, order_duration: 20, order_status: 'waiting', order_product_part: [{ name: 'P1', sku: 'S1', process: [1], setup: [60], cycle: [10] }] }
+      ];
+
+      // Serial model restricts concurrencyLimit to 1
+      const selected = solveOptimalOrderSelection(orders, stations, {
+        concurrencyLimit: 1,
+        shiftDurationSeconds: 28800
+      });
+
+      expect(selected.length).toBe(1);
+      expect(selected[0].order_no).toBe(101); // EDD highest priority order
+
+      const jobs = scheduleOrdersFiniteCapacity(selected, stations, 100000, 600, 0);
+      expect(jobs.length).toBe(1);
+    });
+
+    it('2. Parallel Production Model: allows multiple orders and scales workload across parallel machinery', () => {
+      // Station 1 has 2 parallel machines
+      const stations: StationItem[] = [
+        { 
+          st_number: 1, 
+          st_name: 'Cutting Station', 
+          st_machine: [
+            { mid: 'm1', name: 'Cutter A', number: 1 },
+            { mid: 'm2', name: 'Cutter B', number: 2 }
+          ] 
+        }
+      ];
+
+      const orders: OrderItem[] = [
+        { $key: 'ord1', order_no: 101, order_quantity: 20, order_delivery: 1000, order_duration: 20, order_status: 'waiting', order_product_part: [{ name: 'P1', sku: 'S1', process: [1], setup: [100], cycle: [10] }] },
+        { $key: 'ord2', order_no: 102, order_quantity: 20, order_delivery: 1050, order_duration: 20, order_status: 'waiting', order_product_part: [{ name: 'P2', sku: 'S2', process: [1], setup: [100], cycle: [10] }] }
+      ];
+
+      // Parallel model concurrencyLimit set to 2
+      const selected = solveOptimalOrderSelection(orders, stations, {
+        concurrencyLimit: 2,
+        shiftDurationSeconds: 28800
+      });
+
+      expect(selected.length).toBe(2);
+
+      const jobs = scheduleOrdersFiniteCapacity(selected, stations, 100000, 600, 0);
+      
+      // Workload for 20 units: 100 + (10 * 20) = 300s
+      // With 2 parallel machines, scaled duration = 300 / 2 = 150s
+      const job1 = jobs.find(j => j.order_no === 101)!;
+      expect(job1.end - job1.start).toBe(150);
+    });
+
+    it('3. Multi-Component Production Model: respects part dependencies (assembly waits for prerequisite parts)', () => {
+      const stations: StationItem[] = [
+        { st_number: 1, st_name: 'Cutting', st_machine: [{ mid: 'm1', name: 'Cutter', number: 1 }] },
+        { st_number: 2, st_name: 'Assembly', st_machine: [{ mid: 'm2', name: 'Assy M/C', number: 2 }] }
+      ];
+
+      // Order has 2 parts: 'Fabric Frame' (SKU: FRAME) and 'Final Cover' (SKU: COVER, depends on FRAME)
+      const orders: OrderItem[] = [
+        {
+          $key: 'ord1',
+          order_no: 201,
+          order_quantity: 10,
+          order_delivery: 1000,
+          order_duration: 30,
+          order_status: 'waiting',
+          order_product_part: [
+            // Dependent Assembly Part (defined first in array to test sorting resilience)
+            { name: 'Final Cover', sku: 'COVER', dependency: 'FRAME', process: [2], setup: [60], cycle: [10] },
+            // Prerequisite Independent Part
+            { name: 'Fabric Frame', sku: 'FRAME', process: [1], setup: [60], cycle: [10] }
+          ]
+        }
+      ];
+
+      const startTime = 100000;
+      const delaySec = 300;
+
+      const jobs = scheduleOrdersFiniteCapacity(orders, stations, startTime, delaySec, 0);
+
+      const frameJob = jobs.find(j => j.job_sku === 'FRAME')!;
+      const coverJob = jobs.find(j => j.job_sku === 'COVER')!;
+
+      // Frame Job on ST-1 starts at startTime (100000)
+      expect(frameJob.start).toBe(startTime);
+      // Workload = 60 + (10 * 10) = 160s. Ends at 100160.
+      expect(frameJob.end).toBe(100160);
+
+      // Cover Job (dependent on FRAME) cannot start until FRAME completes + inter-station delay (100160 + 300 = 100460)
+      expect(coverJob.start).toBeGreaterThanOrEqual(frameJob.end + delaySec);
+      expect(coverJob.start).toBe(100460);
+    });
+  });
+
   describe('scheduleOrdersFiniteCapacity (Non-Overlapping Queue Dispatch)', () => {
     const stations: StationItem[] = [
       { st_number: 1, st_name: 'Station 1', st_machine: [{ mid: 'm1', name: 'Machine 1', number: 1 }] },
