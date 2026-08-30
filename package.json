@@ -23,6 +23,7 @@
     "@vaadin/router": "^1.7.4",
     "chart.js": "^4.4.1",
     "firebase": "^10.8.0",
+    "javascript-lp-solver": "^1.0.3",
     "lit": "^3.1.2",
     "lodash-es": "^4.17.21",
     "ramda": "^0.29.1"

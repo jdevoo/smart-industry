@@ -4,13 +4,23 @@ import { consume } from '@lit/context';
 import { ref as dbRef, push, set, remove, update } from 'firebase/database';
 import { db } from '../config/firebase.js';
 import { userContext, UserContextValue } from '../context/userContext.js';
-import { sortOrdersHeuristically, OrderItem as SchedOrderItem } from '../utils/scheduling.js';
+import { 
+  solveOptimalOrderSelection, 
+  scheduleOrdersFiniteCapacity, 
+  OrderItem as SchedOrderItem,
+  StationItem as SchedStationItem,
+  InventoryItem as SchedInventoryItem,
+  ProductItem as SchedProductItem
+} from '../utils/scheduling.js';
 import { displayDateFromTimestamp, formatDurationHM, formatTimeOnly } from '../utils/date.js';
 import { columnBodyRenderer, columnHeaderRenderer } from '@vaadin/grid/lit.js';
 import {
   ordersContext,
   scheduleDataContext,
   stationsContext,
+  inventoryContext,
+  productsContext,
+  performanceContext,
   scheduleConfigContext,
   operationContext,
   factoryProfileContext,
@@ -18,7 +28,8 @@ import {
   DocContextValue,
   OperationConfigData,
   ScheduleConfigData,
-  FactoryProfileData
+  FactoryProfileData,
+  PerformanceData
 } from '../context/dataContexts.js';
 import { DbFolder, getCompanyPath } from '../config/db-paths.js';
 
@@ -324,6 +335,18 @@ export class ViewPlanScheduling extends LitElement {
   @state()
   private profileConfigState!: DocContextValue<FactoryProfileData>;
 
+  @consume({ context: inventoryContext, subscribe: true })
+  @state()
+  private inventoryState!: QueryContextValue<SchedInventoryItem>;
+
+  @consume({ context: productsContext, subscribe: true })
+  @state()
+  private productsState!: QueryContextValue<SchedProductItem>;
+
+  @consume({ context: performanceContext, subscribe: true })
+  @state()
+  private performanceState!: DocContextValue<PerformanceData>;
+
   formatDuration(seconds: number): string {
     return formatDurationHM(seconds);
   }
@@ -357,7 +380,7 @@ export class ViewPlanScheduling extends LitElement {
       return;
     }
 
-    if (!confirm('This will clear the current schedule timeline and run the EDD/SPT algorithm to plan pending runs. Proceed?')) {
+    if (!confirm('This will clear the current schedule timeline and run the Discrete LP Optimization + Finite Capacity algorithm to plan pending runs. Proceed?')) {
       return;
     }
 
@@ -365,95 +388,65 @@ export class ViewPlanScheduling extends LitElement {
       // 1. Clear active scheduling table
       await remove(dbRef(db, getCompanyPath(companyKey, DbFolder.SCHEDULE_DATA)));
 
-      // 2. Fetch the unsorted, active waiting orders
+      // 2. Fetch active waiting orders
       const orders = this.ordersState.data.filter((o: OrderItem) => o.order_status !== 'done' && o.order_status !== 'cancel');
       if (orders.length === 0) {
         alert('No pending or waiting orders to schedule!');
         return;
       }
 
-      // 3. Sort orders based on EDD (Earliest Due Date) + SPT (Shortest Processing Time) heuristics
-      const sortedOrders = sortOrdersHeuristically(orders as unknown as SchedOrderItem[]) as unknown as OrderItem[];
-
-      // 4. Copy the concurrent orders list matching parallel capacities
-      const limit = (profileModel === 'parallel') ? concurrencyVal : 1;
-      const scheduledOrdersSet = sortedOrders.slice(0, limit);
-
-      // Set operational shifts starting constraints
+      // Calculate shift duration in seconds from op_start and op_end
       const opStartStr = opConfig?.op_start || '08:00';
+      const opEndStr = opConfig?.op_end || '17:00';
       const [startH, startM] = opStartStr.split(':').map(Number);
-      
+      const [endH, endM] = opEndStr.split(':').map(Number);
+
+      const shiftStartSec = startH * 3600 + startM * 60;
+      const shiftEndSec = endH * 3600 + endM * 60;
+      const shiftDurationSeconds = Math.max(3600, shiftEndSec - shiftStartSec);
+
+      const rawAw = this.performanceState.data?.aw;
+      const wasteRatio = typeof rawAw === 'number' ? rawAw : (parseFloat(rawAw || '0') || 0);
+
+      const limit = (profileModel === 'parallel') ? concurrencyVal : 1;
+
+      // 3. Solve Discrete Optimization (MILP) to select optimal orders constrained by workstation shift capacity & inventory
+      const selectedOrders = solveOptimalOrderSelection(
+        orders as unknown as SchedOrderItem[],
+        this.stationsState.data as unknown as SchedStationItem[],
+        {
+          shiftDurationSeconds,
+          concurrencyLimit: limit,
+          inventory: this.inventoryState.data as unknown as SchedInventoryItem[],
+          products: this.productsState.data as unknown as SchedProductItem[],
+          wasteRatio
+        }
+      ) as unknown as OrderItem[];
+
+      // 4. Mark selected orders WIP in Firebase
+      for (const order of selectedOrders) {
+        if (order.$key) {
+          await update(dbRef(db, getCompanyPath(companyKey, DbFolder.ORDER_DATA, order.$key)), { order_status: 'wip' });
+        }
+      }
+
+      // Set operational shifts starting timestamp
       const today = new Date();
       today.setHours(startH, startM, 0, 0);
       const initialStartTimestamp = Math.round(today.getTime() / 1000);
 
       const delayVal = schedConfig?.delay;
       const delayMinutes = typeof delayVal === 'number' ? delayVal : (parseInt(delayVal || '10') || 10);
-      const delaySeconds = delayMinutes * 60; // default 10 minutes delay in seconds
+      const delaySeconds = delayMinutes * 60;
 
-      // 5. Run the workload reduction, parallel machine division, and timeline offset calculators
-      const resultItems: any[] = [];
-
-      for (let i = 0; i < scheduledOrdersSet.length; i++) {
-        const order = scheduledOrdersSet[i];
-        
-        // Mark order WIP
-        await update(dbRef(db, getCompanyPath(companyKey, DbFolder.ORDER_DATA, order.$key)), { order_status: 'wip' });
-
-        const parts = order.order_product_part || [];
-
-        for (let j = 0; j < parts.length; j++) {
-          const part = parts[j];
-          const partProcesses = part.process || [];
-          const partSetup = part.setup || [];
-          const partCycle = part.cycle || [];
-
-          let previousEndTime = initialStartTimestamp;
-
-          const jobID = Math.random().toString(36).substring(2, 14);
-
-          for (let pIdx = 0; pIdx < partProcesses.length; pIdx++) {
-            const stationNum = partProcesses[pIdx];
-            const setupTime = partSetup[pIdx] || 0;
-            const cycleTime = partCycle[pIdx] || 0;
-
-            const targetQty = order.order_quantity;
-            const itemWorkloadSeconds = setupTime + (cycleTime * targetQty);
-
-            // Compute allocated machines (Scales duration down under station concurrent machinery)
-            const station = this.stationsState.data.find((s: StationItem) => s.st_number === stationNum);
-            const machinesAvailable = station?.st_machine?.length || 1;
-            const scaledDurationSeconds = Math.ceil(itemWorkloadSeconds / machinesAvailable);
-
-            const startSeconds = previousEndTime + (pIdx > 0 ? delaySeconds : 0);
-            const endSeconds = startSeconds + scaledDurationSeconds;
-            
-            previousEndTime = endSeconds;
-
-            resultItems.push({
-              job_id: jobID,
-              order_no: order.order_no,
-              order_customer: order.order_customer,
-              order_product: order.order_product_name,
-              order_color: order.order_color,
-              job_part: part.name,
-              job_sku: part.sku,
-              job_quantity: order.order_quantity,
-              job_status: 'waiting',
-              job_machine: [machinesAvailable],
-              job_station: [stationNum],
-              start: startSeconds,
-              end: endSeconds,
-              job_complete: 0.00,
-              job_good: 0,
-              job_defect: 0,
-              order_delivery: order.order_delivery,
-              order_date: order.order_date,
-              order_description: order.order_product_description
-            });
-          }
-        }
-      }
+      // 5. Generate finite-capacity non-overlapping workstation queue schedule
+      const resultItems = scheduleOrdersFiniteCapacity(
+        selectedOrders as unknown as SchedOrderItem[],
+        this.stationsState.data as unknown as SchedStationItem[],
+        initialStartTimestamp,
+        delaySeconds,
+        wasteRatio
+      );
 
       // 6. Bulk push calculated jobs schedule straight to Firebase
       const scheduleRef = dbRef(db, getCompanyPath(companyKey, DbFolder.SCHEDULE_DATA));
@@ -466,11 +459,11 @@ export class ViewPlanScheduling extends LitElement {
       const notifyRef = push(dbRef(db, getCompanyPath(companyKey, DbFolder.NOTIFICATION_DATA)));
       await set(notifyRef, {
         created: Math.round(Date.now() / 1000),
-        detail: `Successfully re-scheduled and dispatched ${scheduledOrdersSet.length} orders to shopfloor tracking.`,
+        detail: `Successfully optimized and dispatched ${resultItems.length} job steps for ${selectedOrders.length} orders to shopfloor tracking.`,
         type: 'normal'
       });
 
-      alert('Heuristic schedule generation successfully processed. Check your live timeline details below!');
+      alert(`Discrete LP Optimization complete. Successfully scheduled ${selectedOrders.length} orders across workstations!`);
     } catch (err) {
       console.error('Reschedule algorithm error', err);
     }
@@ -657,7 +650,7 @@ export class ViewPlanScheduling extends LitElement {
               <md-icon slot="icon">delete_sweep</md-icon> Clear Schedule
             </md-outlined-button>
             <md-filled-button @click=${this.runSchedulingHeuristic}>
-              <md-icon slot="icon">auto_schedule</md-icon> Run Reschedule (EDD/SPT Heuristic)
+              <md-icon slot="icon">auto_schedule</md-icon> Run Reschedule (Discrete LP Optimization)
             </md-filled-button>
           </div>
         </div>
@@ -751,7 +744,7 @@ export class ViewPlanScheduling extends LitElement {
         <div class="gantt-card">
           <h3 class="card-title">Scheduling Gantt Chart</h3>
           <p style="font-size:0.85rem; color:#666; margin:6px 0 16px 0; line-height:1.4;">
-            This visual chart illustrates the chronological flow of part processing across your workstations, sorted by Earliest Due Date (EDD) then Shortest Processing Time (SPT):
+            This visual chart illustrates the chronological flow of part processing across your workstations, optimized via Mixed Integer Linear Programming (MILP) and finite-capacity workstation queuing:
           </p>
 
           ${!hasGanttData ? html`
