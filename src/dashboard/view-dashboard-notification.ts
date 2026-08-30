@@ -184,13 +184,13 @@ export class ViewDashboardNotification extends LitElement {
             <vaadin-grid-column
               flex="0.5"
               ${columnHeaderRenderer(() => html`#`, [])}
-              ${columnBodyRenderer((_item: any, model: any) => html`${model.index}`, [])}
+              ${columnBodyRenderer((_item: NotificationItem, model: { index: number }) => html`${model.index + 1}`, [])}
             ></vaadin-grid-column>
 
             <vaadin-grid-column
               flex="1"
               ${columnHeaderRenderer(() => html`Severity`, [])}
-              ${columnBodyRenderer((item: any) => html`
+              ${columnBodyRenderer((item: NotificationItem) => html`
                 <span class="status-${item.type}">${item.type}</span>
               `, [])}
             ></vaadin-grid-column>
@@ -198,13 +198,13 @@ export class ViewDashboardNotification extends LitElement {
             <vaadin-grid-column
               flex="3"
               ${columnHeaderRenderer(() => html`Detail Description`, [])}
-              ${columnBodyRenderer((item: any) => html`${item.detail}`, [])}
+              ${columnBodyRenderer((item: NotificationItem) => html`${item.detail}`, [])}
             ></vaadin-grid-column>
 
             <vaadin-grid-column
               flex="1.5"
               ${columnHeaderRenderer(() => html`Timestamp`, [])}
-              ${columnBodyRenderer((item: any) => html`
+              ${columnBodyRenderer((item: NotificationItem) => html`
                 ${this.formatTimestamp(item.created)}
               `, [])}
             ></vaadin-grid-column>

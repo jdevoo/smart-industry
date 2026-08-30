@@ -18,6 +18,46 @@ export interface DocContextValue<T = any> {
   error: Error | null;
 }
 
+// Concrete data interfaces for context values
+export interface FactoryProfileData {
+  name?: string;
+  type?: string;
+  model?: string;
+  concurrency?: string | number;
+  setup?: boolean;
+}
+
+export interface OperationConfigData {
+  op_start?: string;
+  op_end?: string;
+  ot_start?: string;
+  ot_end?: string;
+  op_day?: string[] | string;
+  production_model?: string;
+}
+
+export interface PerformanceData {
+  oee?: number;
+  optimize?: string;
+  au?: number | string;
+  meff?: number | string;
+  aw?: number | string;
+}
+
+export interface ScheduleConfigData {
+  interval?: number | string;
+  delay?: number | string;
+  start_interval?: number;
+}
+
+export interface CompanyUserData {
+  uid: string;
+  email: string;
+  displayname?: string;
+  role: string;
+  photoURL?: string;
+}
+
 // Global real-time query contexts
 export const ordersContext = createContext<QueryContextValue>('orders-context');
 export const machinesContext = createContext<QueryContextValue>('machines-context');

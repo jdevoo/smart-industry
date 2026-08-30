@@ -4,7 +4,7 @@ import { consume } from '@lit/context';
 import { ref as dbRef, push, set, update, get } from 'firebase/database';
 import { db } from '../config/firebase.js';
 import { userContext, UserContextValue } from '../context/userContext.js';
-import { customersContext, productsContext, performanceContext, QueryContextValue, DocContextValue } from '../context/dataContexts.js';
+import { customersContext, productsContext, performanceContext, QueryContextValue, DocContextValue, PerformanceData } from '../context/dataContexts.js';
 import { FirebaseDocController } from '../controllers/FirebaseDocController.js';
 import { calculateRequiredActualQuantity, calculateOperationDuration } from '../utils/scheduling.js';
 import { formatDurationHMS } from '../utils/date.js';
@@ -184,7 +184,7 @@ export class ViewPlanOrder extends LitElement {
 
   @consume({ context: performanceContext, subscribe: true })
   @state()
-  private performanceState!: DocContextValue;
+  private performanceState!: DocContextValue<PerformanceData>;
 
   // Active form field states
   @state() private selectedCustomerKey = '';
@@ -256,7 +256,8 @@ export class ViewPlanOrder extends LitElement {
     }
 
     // Verify product processes fit current layout concurrency limitations
-    const wasteRatio = (this.performanceState.data as any)?.aw || 0;
+    const rawAw = this.performanceState.data?.aw;
+    const wasteRatio = typeof rawAw === 'number' ? rawAw : parseFloat(rawAw || '0') || 0;
     const actualQty = calculateRequiredActualQuantity(this.orderQuantity, wasteRatio);
 
     // Calculate aggregated run durations across parts
@@ -366,7 +367,8 @@ export class ViewPlanOrder extends LitElement {
     const products = this.productsState.data || [];
 
     const selectedProduct = this.getSelectedProduct();
-    const wasteRatio = (this.performanceState.data as any)?.aw || 0;
+    const rawAw = this.performanceState.data?.aw;
+    const wasteRatio = typeof rawAw === 'number' ? rawAw : parseFloat(rawAw || '0') || 0;
     const actualQty = calculateRequiredActualQuantity(this.orderQuantity, wasteRatio);
 
     // Calculate dynamic duration estimates

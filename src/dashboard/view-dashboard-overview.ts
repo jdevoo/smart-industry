@@ -18,6 +18,11 @@ import {
   DocContextValue
 } from '../context/dataContexts.js';
 
+interface OrderItem {
+  $key?: string;
+  order_status?: string;
+}
+
 @customElement('view-dashboard-overview')
 export class ViewDashboardOverview extends LitElement {
   static override styles = css`
@@ -150,7 +155,7 @@ export class ViewDashboardOverview extends LitElement {
   // Exclusively consume our shared global context providers (0 redundant Firebase network listeners!)
   @consume({ context: ordersContext, subscribe: true })
   @state()
-  private ordersState!: QueryContextValue;
+  private ordersState!: QueryContextValue<OrderItem>;
 
   @consume({ context: machinesContext, subscribe: true })
   @state()
@@ -217,7 +222,7 @@ export class ViewDashboardOverview extends LitElement {
     const hasMachines = this.machinesState.data.length > 0;
     const hasStations = this.stationsState.data.length > 0;
     const hasProducts = this.productsState.data.length > 0;
-    const hasOperation = this.operationState.data && this.operationState.data.production_model;
+    const hasOperation = !!(this.operationState.data && (this.operationState.data.op_start || this.operationState.data.production_model));
 
     if (hasMachines && hasStations && hasProducts && hasOperation) {
       try {
@@ -235,7 +240,7 @@ export class ViewDashboardOverview extends LitElement {
       return;
     }
 
-    const opdayArr = op.op_day.split(',');
+    const opdayArr = Array.isArray(op.op_day) ? op.op_day : (typeof op.op_day === 'string' ? op.op_day.split(',') : []);
     const date = new Date();
     
     const daysMap = ['sun', 'mon', 'tue', 'wed', 'thu', 'fri', 'sat'];
@@ -246,8 +251,8 @@ export class ViewDashboardOverview extends LitElement {
     const current = current_hour + current_minute / 60;
     
     // Parse times like "08:00"
-    const [startH, startM] = op.op_start.split(':').map(Number);
-    const [endH, endM] = op.op_end.split(':').map(Number);
+    const [startH, startM] = (op.op_start || '08:00').split(':').map(Number);
+    const [endH, endM] = (op.op_end || '17:00').split(':').map(Number);
     const starttime = startH + startM / 60;
     const endtime = endH + endM / 60;
 
@@ -278,9 +283,9 @@ export class ViewDashboardOverview extends LitElement {
     }
 
     const orders = this.ordersState.data;
-    const waitCount = orders.filter((o: any) => o.order_status === 'waiting').length;
-    const wipCount = orders.filter((o: any) => o.order_status === 'wip').length;
-    const doneCount = orders.filter((o: any) => o.order_status === 'done').length;
+    const waitCount = orders.filter((o: OrderItem) => o.order_status === 'waiting').length;
+    const wipCount = orders.filter((o: OrderItem) => o.order_status === 'wip').length;
+    const doneCount = orders.filter((o: OrderItem) => o.order_status === 'done').length;
 
     const oee = this.performanceState.data?.oee || 95; // default to 95 if not loaded as shown in original
     const sched = this.scheduleState.data;
@@ -288,7 +293,7 @@ export class ViewDashboardOverview extends LitElement {
     const hasMachines = this.machinesState.data.length > 0;
     const hasStations = this.stationsState.data.length > 0;
     const hasProducts = this.productsState.data.length > 0;
-    const hasOperation = this.operationState.data && this.operationState.data.production_model;
+    const hasOperation = !!(this.operationState.data && (this.operationState.data.op_start || this.operationState.data.production_model));
 
     return html`
       <!-- New User Checklist Alert -->

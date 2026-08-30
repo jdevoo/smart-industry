@@ -15,7 +15,10 @@ import {
   operationContext,
   factoryProfileContext,
   QueryContextValue,
-  DocContextValue
+  DocContextValue,
+  OperationConfigData,
+  ScheduleConfigData,
+  FactoryProfileData
 } from '../context/dataContexts.js';
 import { DbFolder, getCompanyPath } from '../config/db-paths.js';
 
@@ -41,13 +44,22 @@ interface ScheduleItem {
   order_color: string;
 }
 
+interface ProductPartStep {
+  name: string;
+  sku: string;
+  process?: number[];
+  setup?: number[];
+  cycle?: number[];
+  dependency?: string;
+}
+
 interface OrderItem {
   $key: string;
   order_no: number;
   order_customer: string;
   order_product_name: string;
   order_product_description: string;
-  order_product_part: any[];
+  order_product_part: ProductPartStep[];
   order_product_sku: string;
   order_quantity: number;
   order_duration: number;
@@ -57,11 +69,17 @@ interface OrderItem {
   order_date: number;
 }
 
+interface StationMachineInfo {
+  mid: string;
+  name: string;
+  number: number;
+}
+
 interface StationItem {
   $key: string;
   st_name: string;
   st_number: number;
-  st_machine?: any[];
+  st_machine?: StationMachineInfo[];
 }
 
 @customElement('view-plan-scheduling')
@@ -296,15 +314,15 @@ export class ViewPlanScheduling extends LitElement {
 
   @consume({ context: scheduleConfigContext, subscribe: true })
   @state()
-  private scheduleConfigState!: DocContextValue;
+  private scheduleConfigState!: DocContextValue<ScheduleConfigData>;
 
   @consume({ context: operationContext, subscribe: true })
   @state()
-  private operationConfigState!: DocContextValue;
+  private operationConfigState!: DocContextValue<OperationConfigData>;
 
   @consume({ context: factoryProfileContext, subscribe: true })
   @state()
-  private profileConfigState!: DocContextValue;
+  private profileConfigState!: DocContextValue<FactoryProfileData>;
 
   formatDuration(seconds: number): string {
     return formatDurationHM(seconds);
@@ -328,10 +346,11 @@ export class ViewPlanScheduling extends LitElement {
     const companyKey = this.authState.profile?.key;
     if (!companyKey) return;
 
-    const opConfig = this.operationConfigState.data as any;
-    const schedConfig = this.scheduleConfigState.data as any;
-    const profileModel = (this.profileConfigState.data as any)?.model || 'serial';
-    const concurrencyVal = parseInt((this.profileConfigState.data as any)?.concurrency) || 1;
+    const opConfig = this.operationConfigState.data;
+    const schedConfig = this.scheduleConfigState.data;
+    const profileModel = this.profileConfigState.data?.model || 'serial';
+    const rawConcurrency = this.profileConfigState.data?.concurrency;
+    const concurrencyVal = typeof rawConcurrency === 'number' ? rawConcurrency : (parseInt(rawConcurrency || '1') || 1);
 
     if (!opConfig || !schedConfig) {
       alert('Operational configs missing. Please ensure shifts are set up under Factory Setup.');
@@ -361,14 +380,16 @@ export class ViewPlanScheduling extends LitElement {
       const scheduledOrdersSet = sortedOrders.slice(0, limit);
 
       // Set operational shifts starting constraints
-      const opStartStr = opConfig.op_start || '08:00';
+      const opStartStr = opConfig?.op_start || '08:00';
       const [startH, startM] = opStartStr.split(':').map(Number);
       
       const today = new Date();
       today.setHours(startH, startM, 0, 0);
       const initialStartTimestamp = Math.round(today.getTime() / 1000);
 
-      const delaySeconds = (parseInt(schedConfig.delay) || 10) * 60; // default 10 minutes delay in seconds
+      const delayVal = schedConfig?.delay;
+      const delayMinutes = typeof delayVal === 'number' ? delayVal : (parseInt(delayVal || '10') || 10);
+      const delaySeconds = delayMinutes * 60; // default 10 minutes delay in seconds
 
       // 5. Run the workload reduction, parallel machine division, and timeline offset calculators
       const resultItems: any[] = [];
@@ -512,8 +533,8 @@ export class ViewPlanScheduling extends LitElement {
       return j.job_station === this.activeStationNumber;
     });
 
-    const schedConfig = this.scheduleConfigState.data as any;
-    const profileConfig = this.profileConfigState.data as any;
+    const schedConfig = this.scheduleConfigState.data;
+    const profileConfig = this.profileConfigState.data;
 
     // Calculate Gantt overall range
     let minStart = Infinity;

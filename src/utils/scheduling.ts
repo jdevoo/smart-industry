@@ -3,13 +3,22 @@
  * Mapped from view-plan-scheduling.html to strongly typed pure helper functions.
  */
 
+export interface ProductPartStep {
+  name: string;
+  sku: string;
+  process?: number[];
+  setup?: number[];
+  cycle?: number[];
+  dependency?: string;
+}
+
 export interface OrderItem {
   $key?: string;
   order_no: number;
   order_customer?: string;
   order_product_name?: string;
   order_product_description?: string;
-  order_product_part?: any[];
+  order_product_part?: ProductPartStep[];
   order_product_sku?: string;
   order_quantity?: number;
   order_duration: number; // Estimated processing time in minutes

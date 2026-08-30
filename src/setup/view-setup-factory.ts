@@ -9,7 +9,11 @@ import {
   operationContext, 
   performanceContext, 
   scheduleConfigContext, 
-  DocContextValue 
+  DocContextValue,
+  FactoryProfileData,
+  OperationConfigData,
+  PerformanceData,
+  ScheduleConfigData
 } from '../context/dataContexts.js';
 import { DbFolder, getCompanyPath, getUserProfilePath } from '../config/db-paths.js';
 
@@ -97,19 +101,19 @@ export class ViewSetupFactory extends LitElement {
 
   @consume({ context: factoryProfileContext, subscribe: true })
   @state()
-  private factoryProfileState!: DocContextValue;
+  private factoryProfileState!: DocContextValue<FactoryProfileData>;
 
   @consume({ context: operationContext, subscribe: true })
   @state()
-  private operationState!: DocContextValue;
+  private operationState!: DocContextValue<OperationConfigData>;
 
   @consume({ context: performanceContext, subscribe: true })
   @state()
-  private performanceState!: DocContextValue;
+  private performanceState!: DocContextValue<PerformanceData>;
 
   @consume({ context: scheduleConfigContext, subscribe: true })
   @state()
-  private scheduleConfigState!: DocContextValue;
+  private scheduleConfigState!: DocContextValue<ScheduleConfigData>;
 
   @state() private saveSuccess = false;
 
@@ -149,13 +153,13 @@ export class ViewSetupFactory extends LitElement {
     const scheduleLoaded = this.scheduleConfigState.data && !this.scheduleConfigState.loading;
 
     if (profileLoaded && operationLoaded && performanceLoaded && scheduleLoaded) {
-      const p = this.factoryProfileState.data as any;
+      const p = this.factoryProfileState.data!;
       if (p.name !== undefined) this.factoryName = p.name;
       if (p.type !== undefined) this.factoryType = p.type;
       if (p.model !== undefined) this.model = p.model;
-      if (p.concurrency !== undefined) this.concurrency = parseInt(p.concurrency) || 2;
+      if (p.concurrency !== undefined) this.concurrency = typeof p.concurrency === 'number' ? p.concurrency : (parseInt(p.concurrency || '2') || 2);
 
-      const op = this.operationState.data as any;
+      const op = this.operationState.data!;
       if (op.op_start !== undefined) this.op_start = op.op_start;
       if (op.op_end !== undefined) this.op_end = op.op_end;
       if (op.ot_start !== undefined) this.ot_start = op.ot_start;
@@ -171,15 +175,15 @@ export class ViewSetupFactory extends LitElement {
         this.opDays = newDays;
       }
 
-      const perf = this.performanceState.data as any;
+      const perf = this.performanceState.data!;
       if (perf.optimize !== undefined) this.optimize = perf.optimize;
-      if (perf.au !== undefined) this.au = parseInt(perf.au) || 85;
-      if (perf.meff !== undefined) this.meff = parseInt(perf.meff) || 75;
-      if (perf.aw !== undefined) this.aw = parseFloat(perf.aw) || 0.02;
+      if (perf.au !== undefined) this.au = typeof perf.au === 'number' ? perf.au : (parseInt(perf.au || '85') || 85);
+      if (perf.meff !== undefined) this.meff = typeof perf.meff === 'number' ? perf.meff : (parseInt(perf.meff || '75') || 75);
+      if (perf.aw !== undefined) this.aw = typeof perf.aw === 'number' ? perf.aw : (parseFloat(perf.aw || '0.02') || 0.02);
 
-      const sched = this.scheduleConfigState.data as any;
-      if (sched.interval !== undefined) this.interval = parseInt(sched.interval) || 1;
-      if (sched.delay !== undefined) this.delay = parseInt(sched.delay) || 10;
+      const sched = this.scheduleConfigState.data!;
+      if (sched.interval !== undefined) this.interval = typeof sched.interval === 'number' ? sched.interval : (parseInt(sched.interval || '1') || 1);
+      if (sched.delay !== undefined) this.delay = typeof sched.delay === 'number' ? sched.delay : (parseInt(sched.delay || '10') || 10);
 
       this.hasInitializedData = true;
     }

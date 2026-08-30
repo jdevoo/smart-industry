@@ -5,7 +5,7 @@ import { ref as dbRef, update, set, get, remove } from 'firebase/database';
 import { updateProfile, updateEmail, updatePassword, sendEmailVerification, EmailAuthProvider, reauthenticateWithCredential, deleteUser } from 'firebase/auth';
 import { db } from '../config/firebase.js';
 import { userContext, UserContextValue } from '../context/userContext.js';
-import { companyUsersContext, QueryContextValue } from '../context/dataContexts.js';
+import { companyUsersContext, QueryContextValue, CompanyUserData } from '../context/dataContexts.js';
 import { FirebaseDocController } from '../controllers/FirebaseDocController.js';
 import { DbFolder, getCompanyPath, getUserProfilePath } from '../config/db-paths.js';
 
@@ -245,7 +245,7 @@ export class ViewSettings extends LitElement {
 
   @consume({ context: companyUsersContext, subscribe: true })
   @state()
-  private companyUsersState!: QueryContextValue<any>;
+  private companyUsersState!: QueryContextValue<CompanyUserData>;
 
   // App Data customisations
   private appDataController = new FirebaseDocController(this, () =>
@@ -927,7 +927,7 @@ export class ViewSettings extends LitElement {
             <div class="users-list">
               ${(this.companyUsersState.data || []).length === 0 ? html`
                 <span style="font-style:italic; color:#888; text-align:center; padding:12px;">No unlinked members found. All users registered under this key automatically sync here.</span>
-              ` : (this.companyUsersState.data || []).map((u: any) => html`
+              ` : (this.companyUsersState.data || []).map((u: CompanyUserData) => html`
                 <div class="user-list-item">
                   <div class="user-item-details">
                     <img 
