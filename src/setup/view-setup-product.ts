@@ -546,7 +546,7 @@ export class ViewSetupProduct extends LitElement {
                   }} />
                 <div style="display: flex; flex-direction: column; gap: 8px;">
                   <div style="display: flex; gap: 8px;">
-                    <md-outlined-button @click=${this.triggerProductImageUpload}>Change Image</md-outlined-button>
+                    <md-outlined-button @click=${this.triggerProductImageUpload}>Change</md-outlined-button>
                     <md-outlined-button @click=${this.removeProductImage} ?disabled=${!this.editImage}>Remove</md-outlined-button>
                   </div>
                   <span style="font-size:0.75rem; color:#777;">Supports PNG or SVG format, maximum size of 1MB.</span>

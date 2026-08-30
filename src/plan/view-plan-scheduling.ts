@@ -678,7 +678,7 @@ export class ViewPlanScheduling extends LitElement {
               <md-icon slot="icon">delete_sweep</md-icon> Clear Schedule
             </md-outlined-button>
             <md-filled-button @click=${this.runSchedulingHeuristic}>
-              <md-icon slot="icon">auto_schedule</md-icon> Run Reschedule (Discrete LP Optimization)
+              <md-icon slot="icon">auto_schedule</md-icon> Optimize Schedule
             </md-filled-button>
           </div>
         </div>
