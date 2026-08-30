@@ -246,13 +246,23 @@ export class ViewPlanScheduling extends LitElement {
       font-weight: 500;
       display: flex;
       align-items: center;
-      padding: 0 8px;
+      padding: 0 6px;
       white-space: nowrap;
       overflow: hidden;
-      text-overflow: ellipsis;
       box-shadow: 0 2px 4px rgba(0,0,0,0.15);
       cursor: pointer;
       transition: transform 0.2s, box-shadow 0.2s;
+      border: 1px solid rgba(255, 255, 255, 0.8);
+      box-sizing: border-box;
+      min-width: 4px;
+    }
+    .gantt-bar-label {
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+      min-width: 0;
+      width: 100%;
+      display: block;
     }
     .gantt-bar:hover {
       transform: scaleY(1.05);
@@ -775,7 +785,7 @@ export class ViewPlanScheduling extends LitElement {
                             class="gantt-bar" 
                             style="left: ${startPct}%; width: ${durationPct}%; background-color: ${job.order_color || '#202020'};"
                             title="Order #${job.order_no} - ${job.job_part} (${job.job_quantity} units)&#10;Start: ${this.formatTime(job.start)}&#10;End: ${this.formatTime(job.end)}">
-                            #${job.order_no}: ${job.job_part}
+                            <span class="gantt-bar-label">#${job.order_no}: ${job.job_part}</span>
                           </div>
                         `;
                       })}

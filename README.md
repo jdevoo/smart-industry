@@ -45,7 +45,7 @@ In 2026, the IMES codebase was fully modernized, moving away from legacy Polymer
 - [x] **Dynamic Production Simulator Engine:** Visual timeline mapping (Gantt-based) representing job-shop operational sequences before dispatching to the floor. (Fully functional on the *Plan > Scheduling* Gantt Chart and the animated *Plan > Production* Playback Simulator!)
 - [x] **Live Shopfloor Progress Board:** High-density, real-time feedback board matching pending steps against live machine states. (Fully functional on the *Track > Production* view!)
 - [x] **Telemetry Machine/Sensor Counter Integrations:** Enhance physical IoT tracker couplings to automatically complete shopfloor runs. (Done! Programmed with sensor registers, WebUSB hardware scanning, and real-time pulse triggers!)
-- [ ] **Advanced Scheduling Optimization:** Complete the integration of linear programming (using `javascript-lp-solver`) to compute constraint-bound asset utilization alongside heuristics.
+- [x] **Advanced Scheduling Optimization:** Integrated linear programming discrete optimization (using `javascript-lp-solver`) to compute constraint-bound asset utilization and raw material inventory bounds alongside finite-capacity workstation queuing.
 
 ---
 
@@ -57,8 +57,12 @@ While conventional MES software is costly and complex, IMES provides an affordab
 
 ### Core Mathematical & Operational Principles
 
-#### 1. Resource Usage Optimization using Linear Programming (LP)
-Linear programming is targeted to solve resource constraint optimization problems. When given linear capacity bounds (e.g., maximum machine operational hours, limited raw material volume, labor shifts), the system can formulate inequalities to maximize throughput yield or minimize production latency.
+#### 1. Resource Usage Optimization using Mixed-Integer Linear Programming (MILP)
+Linear programming is used to solve complex resource-constrained production scheduling problems. When given capacity bounds (e.g., maximum workstation shift hours, available raw material inventory, and factory line concurrency), IMES constructs a discrete optimization model via **`javascript-lp-solver`**:
+
+$$\text{Maximize } \sum_{i=1}^N \text{Score}_i \cdot x_i \quad \text{subject to} \quad \sum_{i=1}^N W_{i,s} \cdot x_i \le T_s, \quad \sum_{i=1}^N M_{i,k} \cdot x_i \le I_k, \quad x_i \in \{0, 1\}$$
+
+This guarantees that dispatched order runs never overcommit workstation shift budgets or deplete raw material inventory beyond physical availability. Selected orders are then dispatched onto finite-capacity workstation queues without overlapping time slots.
 
 #### 2. Overall Equipment Effectiveness (OEE)
 OEE is a key performance indicator used to measure manufacturing productivity. It breaks down machine operations into three key performance pillars:

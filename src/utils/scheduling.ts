@@ -270,12 +270,30 @@ export function scheduleOrdersFiniteCapacity(
     const parts = order.order_product_part || [];
     const targetQty = calculateRequiredActualQuantity(order.order_quantity || 1, wasteRatio);
 
-    parts.forEach(part => {
+    // Track completed end times per part SKU in this order
+    const partEndTimes = new Map<string, number>();
+
+    // Sort parts so independent parts run before dependent assembly parts
+    const sortedParts = [...parts].sort((a, b) => {
+      if (!a.dependency && b.dependency) return -1;
+      if (a.dependency && !b.dependency) return 1;
+      if (a.dependency === b.sku) return 1;
+      if (b.dependency === a.sku) return -1;
+      return 0;
+    });
+
+    sortedParts.forEach(part => {
       const partProcesses = part.process || [];
       const partSetups = part.setup || [];
       const partCycles = part.cycle || [];
 
-      let partPreviousStepEndTime = initialStartTimestamp;
+      // If this part depends on a prerequisite part SKU, wait for that prerequisite part to complete
+      let prerequisiteEndTime = initialStartTimestamp;
+      if (part.dependency && partEndTimes.has(part.dependency)) {
+        prerequisiteEndTime = partEndTimes.get(part.dependency)!;
+      }
+
+      let partPreviousStepEndTime = prerequisiteEndTime;
       const jobID = Math.random().toString(36).substring(2, 14);
 
       for (let pIdx = 0; pIdx < partProcesses.length; pIdx++) {
@@ -292,7 +310,7 @@ export function scheduleOrdersFiniteCapacity(
         const stationAvailableTime = stationEndTimes.get(stationNum) || initialStartTimestamp;
 
         // Finite capacity routing rule:
-        // Job cannot start until BOTH previous part step finishes (+ delay) AND workstation is free
+        // Job cannot start until BOTH prerequisite / previous part step finishes (+ delay) AND workstation is free
         const startSeconds = Math.max(
           partPreviousStepEndTime + (pIdx > 0 ? delaySeconds : 0),
           stationAvailableTime
@@ -323,6 +341,11 @@ export function scheduleOrdersFiniteCapacity(
           order_date: order.order_date,
           order_description: order.order_product_description
         });
+      }
+
+      // Record completion timestamp for this part SKU
+      if (part.sku) {
+        partEndTimes.set(part.sku, partPreviousStepEndTime);
       }
     });
   });
