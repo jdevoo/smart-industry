@@ -4,7 +4,8 @@ import { consume } from '@lit/context';
 import { ref as dbRef, push, set, remove, update } from 'firebase/database';
 import { db } from '../config/firebase.js';
 import { userContext, UserContextValue } from '../context/userContext.js';
-import { FirebaseQueryController } from '../controllers/FirebaseQueryController.js';
+import { productsContext, stationsContext, QueryContextValue } from '../context/dataContexts.js';
+import { DbFolder, getCompanyPath } from '../config/db-paths.js';
 
 // Material Design 3 UI Imports
 import '@material/web/textfield/outlined-text-field.js';
@@ -236,6 +237,14 @@ export class ViewSetupProduct extends LitElement {
   @state()
   private authState!: UserContextValue;
 
+  @consume({ context: productsContext, subscribe: true })
+  @state()
+  private productsState!: QueryContextValue<ProductItem>;
+
+  @consume({ context: stationsContext, subscribe: true })
+  @state()
+  private stationsState!: QueryContextValue<StationItem>;
+
   @state() private showEditor = false;
   @state() private editingKey: string | null = null;
 
@@ -269,15 +278,6 @@ export class ViewSetupProduct extends LitElement {
       this.showEditor = false;
     }
   }
-
-  // Controllers
-  private productsController = new FirebaseQueryController<ProductItem>(this, () =>
-    this.authState.profile?.key ? `/data/${this.authState.profile.key}/factoryData/product` : null
-  );
-
-  private stationsController = new FirebaseQueryController<StationItem>(this, () =>
-    this.authState.profile?.key ? `/data/${this.authState.profile.key}/factoryData/station` : null
-  );
 
   private openAddDialog() {
     this.editingKey = null;
@@ -313,7 +313,7 @@ export class ViewSetupProduct extends LitElement {
 
     if (confirm('Are you sure you want to delete this product? All routing steps and part configurations inside it will be removed.')) {
       try {
-        await remove(dbRef(db, `/data/${companyKey}/factoryData/product/${key}`));
+        await remove(dbRef(db, getCompanyPath(companyKey, DbFolder.FACTORY_PRODUCT, key)));
       } catch (err) {
         console.error('Failed to remove product', err);
       }
@@ -367,7 +367,8 @@ export class ViewSetupProduct extends LitElement {
 
   private addStepToPart(partIndex: number) {
     const part = this.editParts[partIndex];
-    part.process = [...part.process, this.stationsController.data[0]?.st_number || 1];
+    const stations = this.stationsState.data || [];
+    part.process = [...part.process, stations[0]?.st_number || 1];
     part.cycle = [...part.cycle, 60];
     part.setup = [...part.setup, 120];
     this.requestUpdate();
@@ -404,9 +405,9 @@ export class ViewSetupProduct extends LitElement {
 
     try {
       if (this.editingKey) {
-        await update(dbRef(db, `/data/${companyKey}/factoryData/product/${this.editingKey}`), payload);
+        await update(dbRef(db, getCompanyPath(companyKey, DbFolder.FACTORY_PRODUCT, this.editingKey)), payload);
       } else {
-        const newRef = push(dbRef(db, `/data/${companyKey}/factoryData/product`));
+        const newRef = push(dbRef(db, getCompanyPath(companyKey, DbFolder.FACTORY_PRODUCT)));
         await set(newRef, payload);
       }
       this.showEditor = false;
@@ -425,12 +426,12 @@ export class ViewSetupProduct extends LitElement {
   }
 
   override render() {
-    if (this.productsController.loading || this.stationsController.loading) {
+    if (this.productsState.loading || this.stationsState.loading) {
       return html`<p>Loading Products & Assemblies...</p>`;
     }
 
-    const products = this.productsController.data;
-    const stations = this.stationsController.data;
+    const products = this.productsState.data || [];
+    const stations = this.stationsState.data || [];
 
     return html`
       <div class="product-workspace">
@@ -454,8 +455,8 @@ export class ViewSetupProduct extends LitElement {
                       class="product-icon" 
                       src="${this.getProductImageSrc(product.image)}" 
                       alt="Product Icon"
-                      @error=${(e: any) => {
-                        const target = e.target;
+                      @error=${(e: Event) => {
+                        const target = e.target as HTMLImageElement;
                         if (!target.src.includes('icon-512x512.png') && !target.src.includes('any.svg')) {
                           // 1. Broken custom database image path failed -> fallback to default PNG
                           target.src = '/images/product/icon-512x512.png';
@@ -506,20 +507,20 @@ export class ViewSetupProduct extends LitElement {
               <h5 class="section-title">Product Specifications</h5>
               <div class="form-group">
                 <div class="form-row">
-                  <md-outlined-text-field label="Product Name" .value=${this.editName} @input=${(e: any) => this.editName = e.target.value}></md-outlined-text-field>
-                  <md-outlined-text-field label="Main SKU" .value=${this.editSku} @input=${(e: any) => this.editSku = e.target.value}></md-outlined-text-field>
+                  <md-outlined-text-field label="Product Name" .value=${this.editName} @input=${(e: Event) => this.editName = (e.target as HTMLInputElement).value}></md-outlined-text-field>
+                  <md-outlined-text-field label="Main SKU" .value=${this.editSku} @input=${(e: Event) => this.editSku = (e.target as HTMLInputElement).value}></md-outlined-text-field>
                 </div>
                 <div class="form-row">
-                  <md-outlined-text-field label="Description" .value=${this.editDescription} @input=${(e: any) => this.editDescription = e.target.value}></md-outlined-text-field>
-                  <md-outlined-text-field label="Product Cost" type="number" .value=${this.editCost} @input=${(e: any) => this.editCost = e.target.value}></md-outlined-text-field>
+                  <md-outlined-text-field label="Description" .value=${this.editDescription} @input=${(e: Event) => this.editDescription = (e.target as HTMLInputElement).value}></md-outlined-text-field>
+                  <md-outlined-text-field label="Product Cost" type="number" .value=${this.editCost} @input=${(e: Event) => this.editCost = (e.target as HTMLInputElement).value}></md-outlined-text-field>
                 </div>
                 <div class="form-row" style="grid-template-columns: 1fr 1.5fr 1.5fr;">
                   <div style="display:flex; flex-direction:column; gap:4px; font-size:0.85rem;">
                     <label>Color Theme</label>
-                    <input type="color" .value=${this.editColor} @input=${(e: any) => this.editColor = e.target.value} style="width:100%; height:40px; border-radius:4px; border:1px solid rgba(0,0,0,0.1); cursor:pointer;"/>
+                    <input type="color" .value=${this.editColor} @input=${(e: Event) => this.editColor = (e.target as HTMLInputElement).value} style="width:100%; height:40px; border-radius:4px; border:1px solid rgba(0,0,0,0.1); cursor:pointer;"/>
                   </div>
-                  <md-outlined-text-field label="Inventory Code" .value=${this.editInventoryCode} @input=${(e: any) => this.editInventoryCode = e.target.value}></md-outlined-text-field>
-                  <md-outlined-text-field label="Inventory Use Qty" type="number" .value=${this.editInventoryUse} @input=${(e: any) => this.editInventoryUse = e.target.value}></md-outlined-text-field>
+                  <md-outlined-text-field label="Inventory Code" .value=${this.editInventoryCode} @input=${(e: Event) => this.editInventoryCode = (e.target as HTMLInputElement).value}></md-outlined-text-field>
+                  <md-outlined-text-field label="Inventory Use Qty" type="number" .value=${this.editInventoryUse} @input=${(e: Event) => this.editInventoryUse = (e.target as HTMLInputElement).value}></md-outlined-text-field>
                 </div>
               </div>
             </div>
@@ -533,8 +534,8 @@ export class ViewSetupProduct extends LitElement {
                   style="width: 64px; height: 64px;"
                   src="${this.getProductImageSrc(this.editImage)}" 
                   alt="Product Image Preview"
-                  @error=${(e: any) => {
-                    const target = e.target;
+                  @error=${(e: Event) => {
+                    const target = e.target as HTMLImageElement;
                     if (!target.src.includes('icon-512x512.png') && !target.src.includes('any.svg')) {
                       // 1. Broken custom database image path failed -> fallback to default PNG
                       target.src = '/images/product/icon-512x512.png';
@@ -578,10 +579,10 @@ export class ViewSetupProduct extends LitElement {
                   </div>
 
                   <div class="form-row">
-                    <md-outlined-text-field label="Part Name" .value=${part.name} @input=${(e: any) => { part.name = e.target.value; this.requestUpdate(); }}></md-outlined-text-field>
-                    <md-outlined-text-field label="Part SKU" .value=${part.sku} @input=${(e: any) => { part.sku = e.target.value; this.requestUpdate(); }}></md-outlined-text-field>
+                    <md-outlined-text-field label="Part Name" .value=${part.name} @input=${(e: Event) => { part.name = (e.target as HTMLInputElement).value; this.requestUpdate(); }}></md-outlined-text-field>
+                    <md-outlined-text-field label="Part SKU" .value=${part.sku} @input=${(e: Event) => { part.sku = (e.target as HTMLInputElement).value; this.requestUpdate(); }}></md-outlined-text-field>
                   </div>
-                  <md-outlined-text-field label="Pre-requisite (Dependency Part SKU)" .value=${part.dependency} @input=${(e: any) => { part.dependency = e.target.value; this.requestUpdate(); }}></md-outlined-text-field>
+                  <md-outlined-text-field label="Pre-requisite (Dependency Part SKU)" .value=${part.dependency} @input=${(e: Event) => { part.dependency = (e.target as HTMLInputElement).value; this.requestUpdate(); }}></md-outlined-text-field>
 
                   <!-- Steps List nested inside each Part -->
                   <div class="steps-container">
@@ -599,7 +600,7 @@ export class ViewSetupProduct extends LitElement {
                           label="Workstation" 
                           .value=${stationNum.toString()} 
                           style="height: 48px;"
-                          @change=${(e: any) => { part.process[stepIdx] = Number(e.target.value); this.requestUpdate(); }}>
+                          @change=${(e: Event) => { part.process[stepIdx] = Number((e.target as HTMLSelectElement).value); this.requestUpdate(); }}>
                           ${stations.map(st => html`
                             <md-select-option value=${st.st_number.toString()}>
                               <div slot="headline">ST-${st.st_number} - ${st.st_name}</div>
@@ -611,14 +612,14 @@ export class ViewSetupProduct extends LitElement {
                           label="Cycle (s)" 
                           type="number" 
                           .value=${part.cycle[stepIdx].toString()}
-                          @input=${(e: any) => { part.cycle[stepIdx] = Number(e.target.value); this.requestUpdate(); }}>
+                          @input=${(e: Event) => { part.cycle[stepIdx] = Number((e.target as HTMLInputElement).value); this.requestUpdate(); }}>
                         </md-outlined-text-field>
 
                         <md-outlined-text-field 
                           label="Setup (s)" 
                           type="number" 
                           .value=${part.setup[stepIdx].toString()}
-                          @input=${(e: any) => { part.setup[stepIdx] = Number(e.target.value); this.requestUpdate(); }}>
+                          @input=${(e: Event) => { part.setup[stepIdx] = Number((e.target as HTMLInputElement).value); this.requestUpdate(); }}>
                         </md-outlined-text-field>
 
                         <md-icon-button @click=${() => this.removeStepFromPart(partIdx, stepIdx)}>

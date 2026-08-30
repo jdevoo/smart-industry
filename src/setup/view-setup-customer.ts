@@ -4,7 +4,7 @@ import { consume } from '@lit/context';
 import { ref as dbRef, push, set, remove, update } from 'firebase/database';
 import { db } from '../config/firebase.js';
 import { userContext, UserContextValue } from '../context/userContext.js';
-import { FirebaseQueryController } from '../controllers/FirebaseQueryController.js';
+import { customersContext, QueryContextValue } from '../context/dataContexts.js';
 import { DbFolder, getCompanyPath } from '../config/db-paths.js';
 
 // Material Design 3 UI Imports
@@ -202,6 +202,10 @@ export class ViewSetupCustomer extends LitElement {
   @state()
   private authState!: UserContextValue;
 
+  @consume({ context: customersContext, subscribe: true })
+  @state()
+  private customersState!: QueryContextValue<CustomerItem>;
+
   @state() private showEditor = false;
   @state() private editingKey: string | null = null; // null = Add, string = Edit
 
@@ -229,11 +233,6 @@ export class ViewSetupCustomer extends LitElement {
       this.showEditor = false;
     }
   }
-
-  // Real-time Queries
-  private customerController = new FirebaseQueryController<CustomerItem>(this, () =>
-    this.authState.profile?.key ? getCompanyPath(this.authState.profile.key, DbFolder.FACTORY_CUSTOMER) : null
-  );
 
   private openAddDialog() {
     this.editingKey = null;
@@ -332,11 +331,11 @@ export class ViewSetupCustomer extends LitElement {
   }
 
   override render() {
-    if (this.customerController.loading) {
+    if (this.customersState.loading) {
       return html`<p>Loading Customer Records...</p>`;
     }
 
-    const customers = this.customerController.data;
+    const customers = this.customersState.data || [];
 
     return html`
       <div class="customer-workspace">

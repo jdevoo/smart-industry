@@ -4,7 +4,7 @@ import { consume } from '@lit/context';
 import { ref as dbRef, push, set, update, get } from 'firebase/database';
 import { db } from '../config/firebase.js';
 import { userContext, UserContextValue } from '../context/userContext.js';
-import { FirebaseQueryController } from '../controllers/FirebaseQueryController.js';
+import { customersContext, productsContext, performanceContext, QueryContextValue, DocContextValue } from '../context/dataContexts.js';
 import { FirebaseDocController } from '../controllers/FirebaseDocController.js';
 import { calculateRequiredActualQuantity, calculateOperationDuration } from '../utils/scheduling.js';
 import { formatDurationHMS } from '../utils/date.js';
@@ -174,6 +174,18 @@ export class ViewPlanOrder extends LitElement {
   @state()
   private authState!: UserContextValue;
 
+  @consume({ context: customersContext, subscribe: true })
+  @state()
+  private customersState!: QueryContextValue<CustomerItem>;
+
+  @consume({ context: productsContext, subscribe: true })
+  @state()
+  private productsState!: QueryContextValue<ProductItem>;
+
+  @consume({ context: performanceContext, subscribe: true })
+  @state()
+  private performanceState!: DocContextValue;
+
   // Active form field states
   @state() private selectedCustomerKey = '';
   @state() private selectedProductKey = '';
@@ -183,21 +195,8 @@ export class ViewPlanOrder extends LitElement {
   // Order count increment index
   @state() private nextOrderNo = 1;
 
-  // Real-time Queries
-  private customerController = new FirebaseQueryController<CustomerItem>(this, () =>
-    this.authState.profile?.key ? getCompanyPath(this.authState.profile.key, DbFolder.FACTORY_CUSTOMER) : null
-  );
-
-  private productController = new FirebaseQueryController<ProductItem>(this, () =>
-    this.authState.profile?.key ? getCompanyPath(this.authState.profile.key, DbFolder.FACTORY_PRODUCT) : null
-  );
-
   private orderIndexController = new FirebaseDocController(this, () =>
     this.authState.profile?.key ? getCompanyPath(this.authState.profile.key, DbFolder.FACTORY_ORDER) : null
-  );
-
-  private performanceController = new FirebaseDocController(this, () =>
-    this.authState.profile?.key ? getCompanyPath(this.authState.profile.key, DbFolder.FACTORY_PERFORMANCE) : null
   );
 
   private appDataController = new FirebaseDocController(this, () =>
@@ -223,11 +222,11 @@ export class ViewPlanOrder extends LitElement {
   }
 
   private getSelectedCustomer() {
-    return this.customerController.data.find(c => c.$key === this.selectedCustomerKey);
+    return (this.customersState.data || []).find(c => c.$key === this.selectedCustomerKey);
   }
 
   private getSelectedProduct() {
-    return this.productController.data.find(p => p.$key === this.selectedProductKey);
+    return (this.productsState.data || []).find(p => p.$key === this.selectedProductKey);
   }
 
   private getSumSetupTime(setup: number[]) {
@@ -257,7 +256,7 @@ export class ViewPlanOrder extends LitElement {
     }
 
     // Verify product processes fit current layout concurrency limitations
-    const wasteRatio = this.performanceController.data?.aw || 0;
+    const wasteRatio = (this.performanceState.data as any)?.aw || 0;
     const actualQty = calculateRequiredActualQuantity(this.orderQuantity, wasteRatio);
 
     // Calculate aggregated run durations across parts
@@ -359,15 +358,15 @@ export class ViewPlanOrder extends LitElement {
   }
 
   override render() {
-    if (this.customerController.loading || this.productController.loading) {
+    if (this.customersState.loading || this.productsState.loading) {
       return html`<p>Loading sales and parts databases...</p>`;
     }
 
-    const customers = this.customerController.data;
-    const products = this.productController.data;
+    const customers = this.customersState.data || [];
+    const products = this.productsState.data || [];
 
     const selectedProduct = this.getSelectedProduct();
-    const wasteRatio = this.performanceController.data?.aw || 0;
+    const wasteRatio = (this.performanceState.data as any)?.aw || 0;
     const actualQty = calculateRequiredActualQuantity(this.orderQuantity, wasteRatio);
 
     // Calculate dynamic duration estimates

@@ -1,8 +1,7 @@
 import { LitElement, html, css } from 'lit';
 import { customElement, state } from 'lit/decorators.js';
 import { consume } from '@lit/context';
-import { userContext, UserContextValue } from '../context/userContext.js';
-import { FirebaseQueryController } from '../controllers/FirebaseQueryController.js';
+import { scheduleDataContext, stationsContext, QueryContextValue } from '../context/dataContexts.js';
 
 // Material Design 3 Imports
 import '@material/web/button/filled-button.js';
@@ -333,18 +332,13 @@ export class ViewPlanProduction extends LitElement {
     }
   `;
 
-  @consume({ context: userContext, subscribe: true })
+  @consume({ context: scheduleDataContext, subscribe: true })
   @state()
-  private authState!: UserContextValue;
+  private scheduleDataState!: QueryContextValue<ScheduleItem>;
 
-  // Real-time Queries
-  private scheduleQueryController = new FirebaseQueryController<ScheduleItem>(this, () =>
-    this.authState.profile?.key ? `/data/${this.authState.profile.key}/scheduleData` : null
-  );
-
-  private stationQueryController = new FirebaseQueryController<StationItem>(this, () =>
-    this.authState.profile?.key ? `/data/${this.authState.profile.key}/factoryData/station` : null
-  );
+  @consume({ context: stationsContext, subscribe: true })
+  @state()
+  private stationsState!: QueryContextValue<StationItem>;
 
   // Playback state variables
   @state() private isPlaying = false;
@@ -367,7 +361,7 @@ export class ViewPlanProduction extends LitElement {
   override updated(changedProperties: Map<string | symbol, unknown>) {
     super.updated(changedProperties);
 
-    const jobs = this.scheduleQueryController.data;
+    const jobs = this.scheduleDataState.data || [];
     if (jobs.length > 0 && (this.startTimeSeconds === 0 || changedProperties.has('authState'))) {
       let minStart = Infinity;
       let maxEnd = -Infinity;
@@ -392,7 +386,7 @@ export class ViewPlanProduction extends LitElement {
       this.isPlaying = false;
       this.stopAnimation();
     } else {
-      const jobs = this.scheduleQueryController.data;
+      const jobs = this.scheduleDataState.data || [];
       if (jobs.length === 0) {
         alert("Please run scheduling on the 'Scheduling' tab before running simulations.");
         return;
@@ -463,7 +457,7 @@ export class ViewPlanProduction extends LitElement {
   }
 
   override render() {
-    if (this.scheduleQueryController.loading || this.stationQueryController.loading) {
+    if (this.scheduleDataState.loading || this.stationsState.loading) {
       return html`
         <div class="simulator-card">
           <h3 class="simulator-title">Production Simulator</h3>
@@ -472,8 +466,8 @@ export class ViewPlanProduction extends LitElement {
       `;
     }
 
-    const jobs = this.scheduleQueryController.data;
-    const stations = this.stationQueryController.data;
+    const jobs = this.scheduleDataState.data || [];
+    const stations = this.stationsState.data || [];
     const hasData = jobs.length > 0 && this.totalTimelineSeconds > 0;
 
     // Filter jobs active at the current simulation clock time

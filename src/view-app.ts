@@ -660,8 +660,9 @@ export class ViewApp extends LitElement {
     ]);
 
     // Keep activeRoute up to date with browser back/forward buttons
-    window.addEventListener('vaadin-router-location-changed', (e: any) => {
-      const routePath = e.detail.location.pathname;
+    window.addEventListener('vaadin-router-location-changed', (e: Event) => {
+      const customEvent = e as CustomEvent;
+      const routePath = customEvent.detail.location.pathname;
       if (routePath.includes('/dashboard')) {
         this.activeRoute = 'dashboard';
         this.headerTitle = 'Overview Dashboard';
@@ -751,9 +752,10 @@ export class ViewApp extends LitElement {
                 class="user-avatar" 
                 src="${avatarUrl}" 
                 alt="Profile Avatar"
-                @error=${(e: any) => {
-                  if (e.target.src.includes('icon-512x512.png')) {
-                    e.target.src = '/images/profile/any.svg';
+                @error=${(e: Event) => {
+                  const target = e.target as HTMLImageElement;
+                  if (target.src.includes('icon-512x512.png')) {
+                    target.src = '/images/profile/any.svg';
                   }
                 }} />
               <div class="user-details">

@@ -269,14 +269,14 @@ export class ViewLogin extends LitElement {
             label="Email address"
             type="email"
             .value=${this.email}
-            @input=${(e: any) => this.email = e.target.value}
+            @input=${(e: Event) => this.email = (e.target as HTMLInputElement).value}
             required>
           </md-outlined-text-field>
           <md-outlined-text-field
             label="Password"
             type="password"
             .value=${this.password}
-            @input=${(e: any) => this.password = e.target.value}
+            @input=${(e: Event) => this.password = (e.target as HTMLInputElement).value}
             required>
           </md-outlined-text-field>
         </div>
@@ -284,7 +284,7 @@ export class ViewLogin extends LitElement {
           <md-checkbox
             id="keepSession"
             ?checked=${this.remember}
-            @change=${(e: any) => this.remember = e.target.checked}>
+            @change=${(e: Event) => this.remember = (e.target as HTMLInputElement).checked}>
           </md-checkbox>
           <label for="keepSession">Keep me signed in</label>
         </div>
@@ -308,27 +308,27 @@ export class ViewLogin extends LitElement {
             label="Email address"
             type="email"
             .value=${this.email}
-            @input=${(e: any) => this.email = e.target.value}
+            @input=${(e: Event) => this.email = (e.target as HTMLInputElement).value}
             required>
           </md-outlined-text-field>
           <md-outlined-text-field
             label="New password"
             type="password"
             .value=${this.password}
-            @input=${(e: any) => this.password = e.target.value}
+            @input=${(e: Event) => this.password = (e.target as HTMLInputElement).value}
             required>
           </md-outlined-text-field>
           <md-outlined-text-field
             label="Company name"
             .value=${this.company}
-            @input=${(e: any) => this.company = e.target.value}
+            @input=${(e: Event) => this.company = (e.target as HTMLInputElement).value}
             required>
           </md-outlined-text-field>
           <md-outlined-text-field
             label="Phone (+XX XXXX XXXX X)"
             type="tel"
             .value=${this.phone}
-            @input=${(e: any) => this.phone = e.target.value}
+            @input=${(e: Event) => this.phone = (e.target as HTMLInputElement).value}
             required>
           </md-outlined-text-field>
         </div>
@@ -352,7 +352,7 @@ export class ViewLogin extends LitElement {
             label="Email address"
             type="email"
             .value=${this.email}
-            @input=${(e: any) => this.email = e.target.value}
+            @input=${(e: Event) => this.email = (e.target as HTMLInputElement).value}
             required>
           </md-outlined-text-field>
         </div>

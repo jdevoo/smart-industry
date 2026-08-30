@@ -4,7 +4,7 @@ import { consume } from '@lit/context';
 import { ref as dbRef, push, set, remove, update } from 'firebase/database';
 import { db } from '../config/firebase.js';
 import { userContext, UserContextValue } from '../context/userContext.js';
-import { FirebaseQueryController } from '../controllers/FirebaseQueryController.js';
+import { stationsContext, machinesContext, QueryContextValue } from '../context/dataContexts.js';
 import { DbFolder, getCompanyPath } from '../config/db-paths.js';
 
 // Material Design 3 UI Imports
@@ -225,6 +225,14 @@ export class ViewSetupStation extends LitElement {
   @state()
   private authState!: UserContextValue;
 
+  @consume({ context: stationsContext, subscribe: true })
+  @state()
+  private stationsState!: QueryContextValue<StationItem>;
+
+  @consume({ context: machinesContext, subscribe: true })
+  @state()
+  private machinesState!: QueryContextValue<MachineItem>;
+
   @state() private showEditor = false;
   @state() private editingKey: string | null = null;
 
@@ -252,19 +260,11 @@ export class ViewSetupStation extends LitElement {
     }
   }
 
-  // Controllers
-  private stationsController = new FirebaseQueryController<StationItem>(this, () =>
-    this.authState.profile?.key ? getCompanyPath(this.authState.profile.key, DbFolder.FACTORY_STATION) : null
-  );
-
-  private machinesController = new FirebaseQueryController<MachineItem>(this, () =>
-    this.authState.profile?.key ? getCompanyPath(this.authState.profile.key, DbFolder.FACTORY_MACHINE) : null
-  );
-
   private openAddDialog() {
     this.editingKey = null;
     this.editName = '';
-    const currentMax = this.stationsController.data.reduce((max, item) => item.st_number > max ? item.st_number : max, 0);
+    const stations = this.stationsState.data || [];
+    const currentMax = stations.reduce((max, item) => item.st_number > max ? item.st_number : max, 0);
     this.editNumber = currentMax + 1;
     this.draftMachines = [];
     this.selectedMachineKeyToAssign = '';
@@ -296,8 +296,9 @@ export class ViewSetupStation extends LitElement {
   private addMachineToDraft() {
     if (!this.selectedMachineKeyToAssign) return;
 
-    // Find full machine item in our list controller
-    const machine = this.machinesController.data.find(m => m.$key === this.selectedMachineKeyToAssign);
+    // Find full machine item in our list state
+    const machines = this.machinesState.data || [];
+    const machine = machines.find(m => m.$key === this.selectedMachineKeyToAssign);
     if (!machine) return;
 
     // Check if already assigned to draft
@@ -350,12 +351,12 @@ export class ViewSetupStation extends LitElement {
   }
 
   override render() {
-    if (this.stationsController.loading || this.machinesController.loading) {
+    if (this.stationsState.loading || this.machinesState.loading) {
       return html`<p>Loading Station Topology...</p>`;
     }
 
-    const stations = this.stationsController.data;
-    const availableMachines = this.machinesController.data.filter(m => m.state !== false); // Only active machinery (defaults to true if undefined)
+    const stations = this.stationsState.data || [];
+    const availableMachines = (this.machinesState.data || []).filter(m => m.state !== false); // Only active machinery (defaults to true if undefined)
 
     return html`
       <div class="station-workspace">

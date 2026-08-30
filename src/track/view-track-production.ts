@@ -569,7 +569,7 @@ export class ViewTrackProduction extends LitElement {
     };
 
     try {
-      const deviceRef = dbRef(db, `/data/${companyKey}/factoryData/device/${this.editDeviceKey}`);
+      const deviceRef = dbRef(db, getCompanyPath(companyKey, DbFolder.FACTORY_DEVICE, this.editDeviceKey));
       await update(deviceRef, payload);
 
       this.showEditDeviceDialog = false;
@@ -661,7 +661,7 @@ export class ViewTrackProduction extends LitElement {
                       <select 
                         style="height:32px; border-radius:4px; border:1px solid #ccc; font-size:0.85rem;"
                         .value=${job.job_sensor || ''}
-                        @change=${(e: any) => this.bindJobSensor(job.$key, e.target.value)}>
+                        @change=${(e: Event) => this.bindJobSensor(job.$key, (e.target as HTMLSelectElement).value)}>
                         <option value="">-- No Sensor Bound --</option>
                         ${devices.map(d => html`
                           <option value=${d.name}>${d.name} (${d.type})</option>
@@ -747,14 +747,14 @@ export class ViewTrackProduction extends LitElement {
               <md-outlined-text-field 
                 label="Device Identifier Name" 
                 .value=${this.newDeviceName}
-                @input=${(e: any) => this.newDeviceName = e.target.value}
+                @input=${(e: Event) => this.newDeviceName = (e.target as HTMLInputElement).value}
                 required>
               </md-outlined-text-field>
 
               <md-outlined-select 
                 label="Sensor Tech Type" 
                 .value=${this.newDeviceType}
-                @change=${(e: any) => this.newDeviceType = e.target.value}>
+                @change=${(e: Event) => this.newDeviceType = (e.target as HTMLSelectElement).value}>
                 <md-select-option value="nodeMCU esp8266"><div slot="headline">nodeMCU ESP8266 (Wi-Fi SoC)</div></md-select-option>
                 <md-select-option value="IR Sensor"><div slot="headline">Infrared Proximity Counter</div></md-select-option>
                 <md-select-option value="RFID scanner"><div slot="headline">RFID Batch Reader</div></md-select-option>
@@ -763,7 +763,7 @@ export class ViewTrackProduction extends LitElement {
               <md-outlined-select 
                 label="Allocated Target Machine" 
                 .value=${this.newDeviceMachine}
-                @change=${(e: any) => this.newDeviceMachine = e.target.value}>
+                @change=${(e: Event) => this.newDeviceMachine = (e.target as HTMLSelectElement).value}>
                 <md-select-option value=""><div slot="headline">-- No Machine Allocated --</div></md-select-option>
                 ${machines.map(m => html`
                   <md-select-option value=${m.name}>
@@ -791,14 +791,14 @@ export class ViewTrackProduction extends LitElement {
               <md-outlined-text-field 
                 label="Device Identifier Name" 
                 .value=${this.editDeviceName}
-                @input=${(e: any) => this.editDeviceName = e.target.value}
+                @input=${(e: Event) => this.editDeviceName = (e.target as HTMLInputElement).value}
                 required>
               </md-outlined-text-field>
 
               <md-outlined-select 
                 label="Sensor Tech Type" 
                 .value=${this.editDeviceType}
-                @change=${(e: any) => this.editDeviceType = e.target.value}>
+                @change=${(e: Event) => this.editDeviceType = (e.target as HTMLSelectElement).value}>
                 <md-select-option value="nodeMCU esp8266"><div slot="headline">nodeMCU ESP8266 (Wi-Fi SoC)</div></md-select-option>
                 <md-select-option value="IR Sensor"><div slot="headline">Infrared Proximity Counter</div></md-select-option>
                 <md-select-option value="RFID scanner"><div slot="headline">RFID Batch Reader</div></md-select-option>
@@ -807,7 +807,7 @@ export class ViewTrackProduction extends LitElement {
               <md-outlined-select 
                 label="Allocated Target Machine" 
                 .value=${this.editDeviceMachine}
-                @change=${(e: any) => this.editDeviceMachine = e.target.value}>
+                @change=${(e: Event) => this.editDeviceMachine = (e.target as HTMLSelectElement).value}>
                 <md-select-option value=""><div slot="headline">-- No Machine Allocated --</div></md-select-option>
                 ${machines.map(m => html`
                   <md-select-option value=${m.name}>
@@ -837,14 +837,14 @@ export class ViewTrackProduction extends LitElement {
                 label="Good / Passed Units" 
                 type="number"
                 .value=${this.reportingGoodCount.toString()}
-                @input=${(e: any) => this.reportingGoodCount = Number(e.target.value)}>
+                @input=${(e: Event) => this.reportingGoodCount = Number((e.target as HTMLInputElement).value)}>
               </md-outlined-text-field>
 
               <md-outlined-text-field 
                 label="Scrap / Defective Units" 
                 type="number"
                 .value=${this.reportingDefectCount.toString()}
-                @input=${(e: any) => this.reportingDefectCount = Number(e.target.value)}>
+                @input=${(e: Event) => this.reportingDefectCount = Number((e.target as HTMLInputElement).value)}>
               </md-outlined-text-field>
             </div>
 

@@ -4,7 +4,7 @@ import { consume } from '@lit/context';
 import { ref as dbRef, push, set, remove, update } from 'firebase/database';
 import { db } from '../config/firebase.js';
 import { userContext, UserContextValue } from '../context/userContext.js';
-import { FirebaseQueryController } from '../controllers/FirebaseQueryController.js';
+import { machinesContext, QueryContextValue } from '../context/dataContexts.js';
 import { DbFolder, getCompanyPath } from '../config/db-paths.js';
 
 // Material Design 3 UI Imports
@@ -163,6 +163,10 @@ export class ViewSetupMachine extends LitElement {
   @state()
   private authState!: UserContextValue;
 
+  @consume({ context: machinesContext, subscribe: true })
+  @state()
+  private machinesState!: QueryContextValue<MachineItem>;
+
   @state() private showEditor = false;
   @state() private editingKey: string | null = null; // null = Add mode, string = Edit mode
 
@@ -191,16 +195,12 @@ export class ViewSetupMachine extends LitElement {
     }
   }
 
-  // Real-time machines list controller
-  private machinesController = new FirebaseQueryController<MachineItem>(this, () =>
-    this.authState.profile?.key ? getCompanyPath(this.authState.profile.key, DbFolder.FACTORY_MACHINE) : null
-  );
-
   private openAddDialog() {
     this.editingKey = null;
     this.editName = '';
     // Suggest next numerical identifier based on current machines length
-    const currentMax = this.machinesController.data.reduce((max, item) => item.number > max ? item.number : max, 0);
+    const machines = this.machinesState.data || [];
+    const currentMax = machines.reduce((max, item) => item.number > max ? item.number : max, 0);
     this.editNumber = currentMax + 1;
     this.editCapacity = '100';
     this.editDescription = '';
@@ -264,11 +264,11 @@ export class ViewSetupMachine extends LitElement {
   }
 
   override render() {
-    if (this.machinesController.loading) {
+    if (this.machinesState.loading) {
       return html`<p>Loading Machine Registry...</p>`;
     }
 
-    const machines = this.machinesController.data;
+    const machines = this.machinesState.data || [];
 
     return html`
       <div class="machine-workspace">

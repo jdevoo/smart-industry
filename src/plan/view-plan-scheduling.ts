@@ -316,7 +316,7 @@ export class ViewPlanScheduling extends LitElement {
 
     if (confirm('Are you sure you want to clear the active schedule timeline? Operators on the shopfloor will lose their current tasks.')) {
       try {
-        await remove(dbRef(db, `/data/${companyKey}/scheduleData`));
+        await remove(dbRef(db, getCompanyPath(companyKey, DbFolder.SCHEDULE_DATA)));
         alert('Active schedule cleared successfully.');
       } catch (err) {
         console.error('Failed to clear scheduleData', err);

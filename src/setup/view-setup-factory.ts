@@ -4,7 +4,14 @@ import { consume } from '@lit/context';
 import { ref as dbRef, update, set } from 'firebase/database';
 import { db } from '../config/firebase.js';
 import { userContext, UserContextValue } from '../context/userContext.js';
-import { FirebaseDocController } from '../controllers/FirebaseDocController.js';
+import { 
+  factoryProfileContext, 
+  operationContext, 
+  performanceContext, 
+  scheduleConfigContext, 
+  DocContextValue 
+} from '../context/dataContexts.js';
+import { DbFolder, getCompanyPath, getUserProfilePath } from '../config/db-paths.js';
 
 // Material Design 3 UI Imports
 import '@material/web/textfield/outlined-text-field.js';
@@ -88,6 +95,22 @@ export class ViewSetupFactory extends LitElement {
   @state()
   private authState!: UserContextValue;
 
+  @consume({ context: factoryProfileContext, subscribe: true })
+  @state()
+  private factoryProfileState!: DocContextValue;
+
+  @consume({ context: operationContext, subscribe: true })
+  @state()
+  private operationState!: DocContextValue;
+
+  @consume({ context: performanceContext, subscribe: true })
+  @state()
+  private performanceState!: DocContextValue;
+
+  @consume({ context: scheduleConfigContext, subscribe: true })
+  @state()
+  private scheduleConfigState!: DocContextValue;
+
   @state() private saveSuccess = false;
 
   // Local working fields mapping to database nodes
@@ -116,46 +139,29 @@ export class ViewSetupFactory extends LitElement {
 
   private hasInitializedData = false;
 
-  // Subscriptions to factory database nodes
-  private profileController = new FirebaseDocController(this, () => 
-    this.authState.profile?.key ? `/data/${this.authState.profile.key}/factoryData/profile` : null
-  );
-
-  private operationController = new FirebaseDocController(this, () => 
-    this.authState.profile?.key ? `/data/${this.authState.profile.key}/factoryData/operation` : null
-  );
-
-  private performanceController = new FirebaseDocController(this, () => 
-    this.authState.profile?.key ? `/data/${this.authState.profile.key}/factoryData/performance` : null
-  );
-
-  private scheduleController = new FirebaseDocController(this, () => 
-    this.authState.profile?.key ? `/data/${this.authState.profile.key}/factoryData/schedule` : null
-  );
-
   override updated() {
     // Only initialize the local working copy when the data has first loaded, to prevent infinite re-rendering loops
     if (this.hasInitializedData) return;
 
-    const profileLoaded = this.profileController.data && !this.profileController.loading;
-    const operationLoaded = this.operationController.data && !this.operationController.loading;
-    const performanceLoaded = this.performanceController.data && !this.performanceController.loading;
-    const scheduleLoaded = this.scheduleController.data && !this.scheduleController.loading;
+    const profileLoaded = this.factoryProfileState.data && !this.factoryProfileState.loading;
+    const operationLoaded = this.operationState.data && !this.operationState.loading;
+    const performanceLoaded = this.performanceState.data && !this.performanceState.loading;
+    const scheduleLoaded = this.scheduleConfigState.data && !this.scheduleConfigState.loading;
 
     if (profileLoaded && operationLoaded && performanceLoaded && scheduleLoaded) {
-      const p = this.profileController.data;
+      const p = this.factoryProfileState.data as any;
       if (p.name !== undefined) this.factoryName = p.name;
       if (p.type !== undefined) this.factoryType = p.type;
       if (p.model !== undefined) this.model = p.model;
       if (p.concurrency !== undefined) this.concurrency = parseInt(p.concurrency) || 2;
 
-      const op = this.operationController.data;
+      const op = this.operationState.data as any;
       if (op.op_start !== undefined) this.op_start = op.op_start;
       if (op.op_end !== undefined) this.op_end = op.op_end;
       if (op.ot_start !== undefined) this.ot_start = op.ot_start;
       if (op.ot_end !== undefined) this.ot_end = op.ot_end;
       if (op.op_day !== undefined) {
-        const days = op.op_day.split(',');
+        const days = typeof op.op_day === 'string' ? op.op_day.split(',') : (op.op_day || []);
         const newDays: Record<string, boolean> = {
           sun: false, mon: false, tue: false, wed: false, thu: false, fri: false, sat: false
         };
@@ -165,13 +171,13 @@ export class ViewSetupFactory extends LitElement {
         this.opDays = newDays;
       }
 
-      const perf = this.performanceController.data;
+      const perf = this.performanceState.data as any;
       if (perf.optimize !== undefined) this.optimize = perf.optimize;
       if (perf.au !== undefined) this.au = parseInt(perf.au) || 85;
       if (perf.meff !== undefined) this.meff = parseInt(perf.meff) || 75;
       if (perf.aw !== undefined) this.aw = parseFloat(perf.aw) || 0.02;
 
-      const sched = this.scheduleController.data;
+      const sched = this.scheduleConfigState.data as any;
       if (sched.interval !== undefined) this.interval = parseInt(sched.interval) || 1;
       if (sched.delay !== undefined) this.delay = parseInt(sched.delay) || 10;
 
@@ -197,7 +203,7 @@ export class ViewSetupFactory extends LitElement {
 
     try {
       // 1. Save profile node
-      await set(dbRef(db, `/data/${companyKey}/factoryData/profile`), {
+      await set(dbRef(db, getCompanyPath(companyKey, DbFolder.FACTORY_PROFILE)), {
         name: this.factoryName || 'Untitled Factory',
         type: this.factoryType,
         model: this.model,
@@ -205,7 +211,7 @@ export class ViewSetupFactory extends LitElement {
       });
 
       // 2. Save operation node
-      await set(dbRef(db, `/data/${companyKey}/factoryData/operation`), {
+      await set(dbRef(db, getCompanyPath(companyKey, DbFolder.FACTORY_OPERATION)), {
         op_start: this.op_start,
         op_end: this.op_end,
         ot_start: this.ot_start,
@@ -215,7 +221,7 @@ export class ViewSetupFactory extends LitElement {
       });
 
       // 3. Save performance node
-      await set(dbRef(db, `/data/${companyKey}/factoryData/performance`), {
+      await set(dbRef(db, getCompanyPath(companyKey, DbFolder.FACTORY_PERFORMANCE)), {
         optimize: this.optimize,
         au: Number(this.au),
         meff: Number(this.meff),
@@ -223,13 +229,13 @@ export class ViewSetupFactory extends LitElement {
       });
 
       // 4. Save schedule configurations
-      await update(dbRef(db, `/data/${companyKey}/factoryData/schedule`), {
+      await update(dbRef(db, getCompanyPath(companyKey, DbFolder.FACTORY_SCHEDULE)), {
         interval: Number(this.interval),
         delay: Number(this.delay)
       });
 
       // 5. Explicitly flag setup complete inside profile node
-      await update(dbRef(db, `/user/${uid}`), { setup: true });
+      await update(dbRef(db, getUserProfilePath(uid)), { setup: true });
 
       this.saveSuccess = true;
       setTimeout(() => this.saveSuccess = false, 4000);
@@ -241,10 +247,10 @@ export class ViewSetupFactory extends LitElement {
 
   override render() {
     if (
-      this.profileController.loading || 
-      this.operationController.loading || 
-      this.performanceController.loading || 
-      this.scheduleController.loading
+      this.factoryProfileState.loading || 
+      this.operationState.loading || 
+      this.performanceState.loading || 
+      this.scheduleConfigState.loading
     ) {
       return html`<p>Retrieving Factory Topology configurations...</p>`;
     }
@@ -258,14 +264,14 @@ export class ViewSetupFactory extends LitElement {
           <md-outlined-text-field 
             label="Factory Name" 
             .value=${this.factoryName}
-            @input=${(e: any) => this.factoryName = e.target.value}
+            @input=${(e: Event) => this.factoryName = (e.target as HTMLInputElement).value}
             required>
           </md-outlined-text-field>
 
           <md-outlined-select 
             label="Manufacturing Layout Type" 
             .value=${this.factoryType} 
-            @change=${(e: any) => this.factoryType = e.target.value}>
+            @change=${(e: Event) => this.factoryType = (e.target as HTMLSelectElement).value}>
             <md-select-option value="jobshop">
               <div slot="headline">Job Shop Manufacturer</div>
             </md-select-option>
@@ -274,7 +280,7 @@ export class ViewSetupFactory extends LitElement {
           <md-outlined-select 
             label="Production Line Flow Model" 
             .value=${this.model} 
-            @change=${(e: any) => this.model = e.target.value}>
+            @change=${(e: Event) => this.model = (e.target as HTMLSelectElement).value}>
             <md-select-option value="serial">
               <div slot="headline">Serial (Single Path)</div>
             </md-select-option>
@@ -293,7 +299,7 @@ export class ViewSetupFactory extends LitElement {
               min="2"
               max="10"
               .value=${this.concurrency.toString()}
-              @input=${(e: any) => this.concurrency = Number(e.target.value)}>
+              @input=${(e: Event) => this.concurrency = Number((e.target as HTMLInputElement).value)}>
             </md-outlined-text-field>
           ` : ''}
         </div>
@@ -307,14 +313,14 @@ export class ViewSetupFactory extends LitElement {
               label="Shift Start" 
               type="time" 
               .value=${this.op_start}
-              @change=${(e: any) => this.op_start = e.target.value}>
+              @change=${(e: Event) => this.op_start = (e.target as HTMLInputElement).value}>
             </md-outlined-text-field>
 
             <md-outlined-text-field 
               label="Shift End" 
               type="time" 
               .value=${this.op_end}
-              @change=${(e: any) => this.op_end = e.target.value}>
+              @change=${(e: Event) => this.op_end = (e.target as HTMLInputElement).value}>
             </md-outlined-text-field>
           </div>
 
@@ -323,14 +329,14 @@ export class ViewSetupFactory extends LitElement {
               label="Overtime Start" 
               type="time" 
               .value=${this.ot_start}
-              @change=${(e: any) => this.ot_start = e.target.value}>
+              @change=${(e: Event) => this.ot_start = (e.target as HTMLInputElement).value}>
             </md-outlined-text-field>
 
             <md-outlined-text-field 
               label="Overtime End" 
               type="time" 
               .value=${this.ot_end}
-              @change=${(e: any) => this.ot_end = e.target.value}>
+              @change=${(e: Event) => this.ot_end = (e.target as HTMLInputElement).value}>
             </md-outlined-text-field>
           </div>
 
@@ -342,7 +348,7 @@ export class ViewSetupFactory extends LitElement {
                   <md-checkbox 
                     id="chk-${day}"
                     ?checked=${this.opDays[day]}
-                    @change=${(e: any) => this.handleDayChange(day, e.target.checked)}>
+                    @change=${(e: Event) => this.handleDayChange(day, (e.target as HTMLInputElement).checked)}>
                   </md-checkbox>
                   <label for="chk-${day}" style="text-transform: capitalize;">${day}</label>
                 </div>
@@ -358,7 +364,7 @@ export class ViewSetupFactory extends LitElement {
           <md-outlined-select 
             label="Productivity Optimization Strategy" 
             .value=${this.optimize} 
-            @change=${(e: any) => this.optimize = e.target.value}>
+            @change=${(e: Event) => this.optimize = (e.target as HTMLSelectElement).value}>
             <md-select-option value="disabled">
               <div slot="headline">No Optimization (Heuristics Only)</div>
             </md-select-option>
@@ -378,7 +384,7 @@ export class ViewSetupFactory extends LitElement {
               min="30"
               max="100"
               .value=${this.au.toString()}
-              @input=${(e: any) => this.au = Number(e.target.value)}>
+              @input=${(e: Event) => this.au = Number((e.target as HTMLInputElement).value)}>
             </md-outlined-text-field>
 
             <md-outlined-text-field 
@@ -388,7 +394,7 @@ export class ViewSetupFactory extends LitElement {
               min="30"
               max="100"
               .value=${this.meff.toString()}
-              @input=${(e: any) => this.meff = Number(e.target.value)}>
+              @input=${(e: Event) => this.meff = Number((e.target as HTMLInputElement).value)}>
             </md-outlined-text-field>
           </div>
 
@@ -400,7 +406,7 @@ export class ViewSetupFactory extends LitElement {
             max="1.00"
             helperText="Ratio of acceptable scrap allocation (e.g. 0.02 = 2% scrap)"
             .value=${this.aw.toString()}
-            @input=${(e: any) => this.aw = Number(e.target.value)}>
+            @input=${(e: Event) => this.aw = Number((e.target as HTMLInputElement).value)}>
           </md-outlined-text-field>
         </div>
 
@@ -411,7 +417,7 @@ export class ViewSetupFactory extends LitElement {
           <md-outlined-select 
             label="Default Rescheduling Cycle" 
             .value=${this.interval.toString()} 
-            @change=${(e: any) => this.interval = Number(e.target.value)}>
+            @change=${(e: Event) => this.interval = Number((e.target as HTMLSelectElement).value)}>
             ${[1, 2, 3, 4, 5, 6, 7].map(i => html`
               <md-select-option value=${i.toString()}>
                 <div slot="headline">Every ${i} ${i === 1 ? 'Day' : 'Days'}</div>
@@ -426,7 +432,7 @@ export class ViewSetupFactory extends LitElement {
             max="180"
             helperText="Travel and setup safety delay allowed between workstation shifts"
             .value=${this.delay.toString()}
-            @input=${(e: any) => this.delay = Number(e.target.value)}>
+            @input=${(e: Event) => this.delay = Number((e.target as HTMLInputElement).value)}>
           </md-outlined-text-field>
         </div>
       </div>

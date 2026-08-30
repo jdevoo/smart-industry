@@ -158,7 +158,7 @@ export class ViewDashboardNotification extends LitElement {
           <md-outlined-select 
             label="Severity Filter" 
             .value=${this.filterSeverity} 
-            @change=${(e: any) => this.filterSeverity = e.target.value}>
+            @change=${(e: Event) => this.filterSeverity = (e.target as HTMLSelectElement).value}>
             <md-select-option value="default"><div slot="headline">All Alerts</div></md-select-option>
             <md-select-option value="normal"><div slot="headline">Normal</div></md-select-option>
             <md-select-option value="warn"><div slot="headline">Warning</div></md-select-option>
@@ -171,7 +171,7 @@ export class ViewDashboardNotification extends LitElement {
               type="date" 
               class="date-input"
               .value=${this.filterDate}
-              @input=${(e: any) => this.filterDate = e.target.value}/>
+              @input=${(e: Event) => this.filterDate = (e.target as HTMLInputElement).value}/>
           </div>
         </div>
 

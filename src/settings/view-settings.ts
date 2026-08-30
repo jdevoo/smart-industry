@@ -5,8 +5,8 @@ import { ref as dbRef, update, set, get, remove } from 'firebase/database';
 import { updateProfile, updateEmail, updatePassword, sendEmailVerification, EmailAuthProvider, reauthenticateWithCredential, deleteUser } from 'firebase/auth';
 import { db } from '../config/firebase.js';
 import { userContext, UserContextValue } from '../context/userContext.js';
+import { companyUsersContext, QueryContextValue } from '../context/dataContexts.js';
 import { FirebaseDocController } from '../controllers/FirebaseDocController.js';
-import { FirebaseQueryController } from '../controllers/FirebaseQueryController.js';
 import { DbFolder, getCompanyPath, getUserProfilePath } from '../config/db-paths.js';
 
 // Material Design 3 Imports
@@ -243,14 +243,13 @@ export class ViewSettings extends LitElement {
   @state() private editNewPassword = '';
   @state() private editCompany = '';
 
+  @consume({ context: companyUsersContext, subscribe: true })
+  @state()
+  private companyUsersState!: QueryContextValue<any>;
+
   // App Data customisations
   private appDataController = new FirebaseDocController(this, () =>
     this.authState.profile?.key ? getCompanyPath(this.authState.profile.key, DbFolder.APP_DATA) : null
-  );
-
-  // Auto-track company users in real-time to prevent solitary user profile deletion
-  private companyUsersQueryController = new FirebaseQueryController<any>(this, () =>
-    this.authState.profile?.key ? getCompanyPath(this.authState.profile.key, DbFolder.USERS) : null
   );
 
   override updated() {
@@ -316,10 +315,10 @@ export class ViewSettings extends LitElement {
     }
   }
 
-  private async toggleMaterialCount(e: any) {
+  private async toggleMaterialCount(e: Event) {
     const companyKey = this.authState.profile?.key;
     if (!companyKey) return;
-    const isChecked = e.target.checked;
+    const isChecked = (e.target as HTMLInputElement).checked;
 
     try {
       await set(dbRef(db, getCompanyPath(companyKey, DbFolder.APP_DATA, 'material_count')), isChecked);
@@ -538,8 +537,8 @@ export class ViewSettings extends LitElement {
     this.shadowRoot?.getElementById('importFileInput')?.click();
   }
 
-  private async handleImportBackup(e: any) {
-    const file = e.target.files[0];
+  private async handleImportBackup(e: Event) {
+    const file = (e.target as HTMLInputElement).files?.[0];
     const companyKey = this.authState.profile?.key;
     if (!file || !companyKey) return;
 
@@ -561,10 +560,10 @@ export class ViewSettings extends LitElement {
 
   // --- 5. Notifications Customizations ---
 
-  private async toggleWebNotifications(e: any) {
+  private async toggleWebNotifications(e: Event) {
     const companyKey = this.authState.profile?.key;
     if (!companyKey) return;
-    const isChecked = e.target.checked;
+    const isChecked = (e.target as HTMLInputElement).checked;
 
     try {
       await set(dbRef(db, getCompanyPath(companyKey, DbFolder.APP_DATA, 'notification')), isChecked);
@@ -574,10 +573,10 @@ export class ViewSettings extends LitElement {
     }
   }
 
-  private async toggleEmailAlerts(e: any) {
+  private async toggleEmailAlerts(e: Event) {
     const companyKey = this.authState.profile?.key;
     if (!companyKey) return;
-    const isChecked = e.target.checked;
+    const isChecked = (e.target as HTMLInputElement).checked;
 
     try {
       await set(dbRef(db, getCompanyPath(companyKey, DbFolder.APP_DATA, 'email_alert')), isChecked);
@@ -749,9 +748,10 @@ export class ViewSettings extends LitElement {
               class="profile-avatar" 
               src="${avatarUrl}" 
               alt="User Avatar"
-              @error=${(e: any) => {
-                if (e.target.src.includes('icon-512x512.png')) {
-                  e.target.src = '/images/profile/any.svg';
+              @error=${(e: Event) => {
+                const target = e.target as HTMLImageElement;
+                if (target.src.includes('icon-512x512.png')) {
+                  target.src = '/images/profile/any.svg';
                 }
               }} />
             <div class="avatar-btn-group">
@@ -769,7 +769,7 @@ export class ViewSettings extends LitElement {
           <md-outlined-text-field 
             label="Display Name" 
             .value=${this.editDisplayName}
-            @input=${(e: any) => this.editDisplayName = e.target.value}>
+            @input=${(e: Event) => this.editDisplayName = (e.target as HTMLInputElement).value}>
           </md-outlined-text-field>
 
           <md-filled-button class="btn-block" @click=${this.saveAccountSettings}>Save Account Details</md-filled-button>
@@ -777,7 +777,7 @@ export class ViewSettings extends LitElement {
           <md-outlined-button 
             class="btn-block" 
             @click=${this.deleteAccount} 
-            ?disabled=${this.companyUsersQueryController.data.length <= 1}
+            ?disabled=${(this.companyUsersState.data || []).length <= 1}
             style="--md-outlined-button-label-text-color: #c62828; --md-outlined-button-outline-color: #fde8e8;"
             title="Delete your personal profile credentials">
             <md-icon slot="icon">no_accounts</md-icon> 
@@ -792,7 +792,7 @@ export class ViewSettings extends LitElement {
             label="Email Address" 
             type="email"
             .value=${this.editEmail}
-            @input=${(e: any) => this.editEmail = e.target.value}>
+            @input=${(e: Event) => this.editEmail = (e.target as HTMLInputElement).value}>
           </md-outlined-text-field>
 
           <md-outlined-text-field 
@@ -800,7 +800,7 @@ export class ViewSettings extends LitElement {
             type="password"
             helperText="Provide password value to change"
             .value=${this.editNewPassword}
-            @input=${(e: any) => this.editNewPassword = e.target.value}>
+            @input=${(e: Event) => this.editNewPassword = (e.target as HTMLInputElement).value}>
           </md-outlined-text-field>
 
           <md-outlined-text-field 
@@ -808,7 +808,7 @@ export class ViewSettings extends LitElement {
             type="password"
             helperText="Enter current password to re-authenticate changes"
             .value=${this.editCurrentPassword}
-            @input=${(e: any) => this.editCurrentPassword = e.target.value}>
+            @input=${(e: Event) => this.editCurrentPassword = (e.target as HTMLInputElement).value}>
           </md-outlined-text-field>
 
           <div style="display:flex; gap:8px; margin-top:4px;">
@@ -870,7 +870,7 @@ export class ViewSettings extends LitElement {
           <md-outlined-text-field 
             label="Company Name" 
             .value=${this.editCompany}
-            @input=${(e: any) => this.editCompany = e.target.value}>
+            @input=${(e: Event) => this.editCompany = (e.target as HTMLInputElement).value}>
           </md-outlined-text-field>
 
           <div style="font-size:0.85rem; color:#555; line-height:1.5; background:#fafafa; border-radius:6px; border:1px solid rgba(0,0,0,0.04); padding:10px;">
@@ -905,7 +905,7 @@ export class ViewSettings extends LitElement {
             <md-outlined-text-field 
               label="Data Keychain ID Key" 
               .value=${this.newKeychainKey}
-              @input=${(e: any) => this.newKeychainKey = e.target.value}
+              @input=${(e: Event) => this.newKeychainKey = (e.target as HTMLInputElement).value}
               required>
             </md-outlined-text-field>
 
@@ -925,17 +925,18 @@ export class ViewSettings extends LitElement {
             <p style="font-size:0.85rem; color:#666; margin:0;">Below are the active registered accounts linked to your factory database keychain:</p>
 
             <div class="users-list">
-              ${this.companyUsersQueryController.data.length === 0 ? html`
+              ${(this.companyUsersState.data || []).length === 0 ? html`
                 <span style="font-style:italic; color:#888; text-align:center; padding:12px;">No unlinked members found. All users registered under this key automatically sync here.</span>
-              ` : this.companyUsersQueryController.data.map((u: any) => html`
+              ` : (this.companyUsersState.data || []).map((u: any) => html`
                 <div class="user-list-item">
                   <div class="user-item-details">
                     <img 
                       class="user-item-avatar" 
                       src="${u.photoURL || '/images/profile/icon-512x512.png'}" 
-                      @error=${(e: any) => {
-                        if (e.target.src.includes('icon-512x512.png')) {
-                          e.target.src = '/images/profile/any.svg';
+                      @error=${(e: Event) => {
+                        const target = e.target as HTMLImageElement;
+                        if (target.src.includes('icon-512x512.png')) {
+                          target.src = '/images/profile/any.svg';
                         }
                       }} />
                     <div class="user-item-info">
@@ -949,7 +950,7 @@ export class ViewSettings extends LitElement {
                       style="min-width:110px; --md-outlined-select-text-field-container-height: 32px;"
                       .value=${u.role}
                       ?disabled=${u.uid === user?.uid}
-                      @change=${(e: any) => this.changeUserRole(u.uid, e.target.value)}>
+                      @change=${(e: Event) => this.changeUserRole(u.uid, (e.target as HTMLSelectElement).value)}>
                       <md-select-option value="operator"><div slot="headline">Operator</div></md-select-option>
                       <md-select-option value="admin"><div slot="headline">Admin</div></md-select-option>
                     </md-outlined-select>

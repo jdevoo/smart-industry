@@ -4,7 +4,8 @@ import { consume } from '@lit/context';
 import { ref as dbRef, set } from 'firebase/database';
 import { db } from '../config/firebase.js';
 import { userContext, UserContextValue } from '../context/userContext.js';
-import { FirebaseDocController } from '../controllers/FirebaseDocController.js';
+import { performanceContext, DocContextValue } from '../context/dataContexts.js';
+import { DbFolder, getCompanyPath } from '../config/db-paths.js';
 
 // Material Design 3 Imports
 import '@material/web/button/outlined-button.js';
@@ -125,14 +126,13 @@ export class ViewTrackPerformance extends LitElement {
   @state()
   private authState!: UserContextValue;
 
+  @consume({ context: performanceContext, subscribe: true })
+  @state()
+  private performanceState!: DocContextValue<PerformanceData>;
+
   @query('#oeeGaugeChart') private canvas!: HTMLCanvasElement;
 
   private chart: Chart | null = null;
-
-  // Real-time Firebase Document Query
-  private performanceController = new FirebaseDocController<PerformanceData>(this, () =>
-    this.authState.profile?.key ? `/data/${this.authState.profile.key}/performanceData` : null
-  );
 
   override disconnectedCallback() {
     super.disconnectedCallback();
@@ -148,9 +148,9 @@ export class ViewTrackPerformance extends LitElement {
   }
 
   private renderChart() {
-    if (!this.canvas || this.performanceController.loading) return;
+    if (!this.canvas || this.performanceState.loading) return;
 
-    const data = this.performanceController.data;
+    const data = this.performanceState.data;
     const oee = typeof data?.oee === 'number' ? Math.max(0, Math.min(100, data.oee)) : 100;
 
     // Define gauge color bands
@@ -197,7 +197,7 @@ export class ViewTrackPerformance extends LitElement {
 
     if (confirm('Are you sure you want to reset the Overall Equipment Effectiveness (OEE) performance meter back to its 100% baseline?')) {
       try {
-        await set(dbRef(db, `/data/${companyKey}/performanceData/oee`), 100);
+        await set(dbRef(db, getCompanyPath(companyKey, DbFolder.PERFORMANCE_DATA, 'oee')), 100);
       } catch (err) {
         console.error('Error resetting OEE performance', err);
       }
@@ -205,11 +205,11 @@ export class ViewTrackPerformance extends LitElement {
   }
 
   override render() {
-    if (this.performanceController.loading) {
+    if (this.performanceState.loading) {
       return html`<p style="text-align: center; color: #666; font-style: italic; margin-top: 32px;">Connecting to shopfloor performance monitors...</p>`;
     }
 
-    const data = this.performanceController.data;
+    const data = this.performanceState.data;
     const oee = typeof data?.oee === 'number' ? Math.max(0, Math.min(100, data.oee)) : 100;
     const wasteRatio = typeof data?.aw === 'number' ? data.aw : 0.05; // Acceptable Waste ratio (default 5%)
 

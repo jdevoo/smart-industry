@@ -4,7 +4,8 @@ import { consume } from '@lit/context';
 import { ref as dbRef, remove } from 'firebase/database';
 import { db } from '../config/firebase.js';
 import { userContext, UserContextValue } from '../context/userContext.js';
-import { FirebaseQueryController } from '../controllers/FirebaseQueryController.js';
+import { warehouseContext, QueryContextValue } from '../context/dataContexts.js';
+import { DbFolder, getCompanyPath } from '../config/db-paths.js';
 import { displayDateFromTimestamp } from '../utils/date.js';
 import { columnBodyRenderer, columnHeaderRenderer } from '@vaadin/grid/lit.js';
 
@@ -68,9 +69,9 @@ export class ViewTrackWarehouse extends LitElement {
   @state()
   private authState!: UserContextValue;
 
-  private warehouseQueryController = new FirebaseQueryController<CompletedOrderArchiveItem>(this, () =>
-    this.authState.profile?.key ? `/data/${this.authState.profile.key}/warehouseData` : null
-  );
+  @consume({ context: warehouseContext, subscribe: true })
+  @state()
+  private warehouseState!: QueryContextValue<CompletedOrderArchiveItem>;
 
   private async clearWarehouse() {
     const companyKey = this.authState.profile?.key;
@@ -78,7 +79,7 @@ export class ViewTrackWarehouse extends LitElement {
 
     if (confirm('Are you sure you want to permanently clear the completed warehouse records? All archived statistics will be deleted.')) {
       try {
-        await remove(dbRef(db, `/data/${companyKey}/warehouseData`));
+        await remove(dbRef(db, getCompanyPath(companyKey, DbFolder.WAREHOUSE_DATA)));
         alert('Warehouse archived records cleared successfully.');
       } catch (err) {
         console.error('Failed to clear warehouse', err);
@@ -92,7 +93,7 @@ export class ViewTrackWarehouse extends LitElement {
 
     if (confirm('Are you sure you want to remove this archived order from the warehouse?')) {
       try {
-        await remove(dbRef(db, `/data/${companyKey}/warehouseData/${key}`));
+        await remove(dbRef(db, getCompanyPath(companyKey, DbFolder.WAREHOUSE_DATA, key)));
       } catch (err) {
         console.error('Failed to delete archived order', err);
       }
@@ -100,7 +101,7 @@ export class ViewTrackWarehouse extends LitElement {
   }
 
   // Formatting helpers for Vaadin Grid columns
-  getFormattedDate(timestamp: number): string {
+  getFormattedDate(timestamp?: number): string {
     if (!timestamp) return 'N/A';
     return displayDateFromTimestamp(timestamp * 1000);
   }
@@ -114,11 +115,11 @@ export class ViewTrackWarehouse extends LitElement {
   }
 
   override render() {
-    if (this.warehouseQueryController.loading) {
+    if (this.warehouseState.loading) {
       return html`<p>Retrieving completed warehouse ledger archives...</p>`;
     }
 
-    const archivedOrders = this.warehouseQueryController.data;
+    const archivedOrders = this.warehouseState.data;
 
     return html`
       <div class="warehouse-container">
@@ -131,43 +132,43 @@ export class ViewTrackWarehouse extends LitElement {
             <vaadin-grid-column
               flex="0.5"
               ${columnHeaderRenderer(() => html`Order No`, [])}
-              ${columnBodyRenderer((item: any) => html`#${item.order_no}`, [])}
+              ${columnBodyRenderer((item: CompletedOrderArchiveItem) => html`#${item.order_no}`, [])}
             ></vaadin-grid-column>
 
             <vaadin-grid-column
               flex="1.5"
               ${columnHeaderRenderer(() => html`Customer`, [])}
-              ${columnBodyRenderer((item: any) => html`${item.order_customer}`, [])}
+              ${columnBodyRenderer((item: CompletedOrderArchiveItem) => html`${item.order_customer}`, [])}
             ></vaadin-grid-column>
 
             <vaadin-grid-column
               flex="1.5"
               ${columnHeaderRenderer(() => html`Product Name`, [])}
-              ${columnBodyRenderer((item: any) => html`${item.order_product}`, [])}
+              ${columnBodyRenderer((item: CompletedOrderArchiveItem) => html`${item.order_product}`, [])}
             ></vaadin-grid-column>
 
             <vaadin-grid-column
               flex="0.8"
               ${columnHeaderRenderer(() => html`Completed Qty`, [])}
-              ${columnBodyRenderer((item: any) => html`${item.order_quantity} units`, [])}
+              ${columnBodyRenderer((item: CompletedOrderArchiveItem) => html`${item.order_quantity} units`, [])}
             ></vaadin-grid-column>
 
             <vaadin-grid-column
               flex="1.2"
               ${columnHeaderRenderer(() => html`Target Due Date`, [])}
-              ${columnBodyRenderer((item: any) => html`${this.getFormattedDate(item.order_delivery)}`, [])}
+              ${columnBodyRenderer((item: CompletedOrderArchiveItem) => html`${this.getFormattedDate(item.order_delivery)}`, [])}
             ></vaadin-grid-column>
 
             <vaadin-grid-column
               flex="1.2"
               ${columnHeaderRenderer(() => html`Completed Date`, [])}
-              ${columnBodyRenderer((item: any) => html`${this.getFormattedDate(item.actual_end)}`, [])}
+              ${columnBodyRenderer((item: CompletedOrderArchiveItem) => html`${this.getFormattedDate(item.actual_end)}`, [])}
             ></vaadin-grid-column>
 
             <vaadin-grid-column
               flex="1"
               ${columnHeaderRenderer(() => html`Actual Lead Time`, [])}
-              ${columnBodyRenderer((item: any) => html`
+              ${columnBodyRenderer((item: CompletedOrderArchiveItem) => html`
                 ${this.formatTimeDifference(item.actual_start, item.actual_end)}
               `, [])}
             ></vaadin-grid-column>
@@ -175,10 +176,16 @@ export class ViewTrackWarehouse extends LitElement {
             <vaadin-grid-column
               flex="0.5"
               ${columnHeaderRenderer(() => html`Action`, [])}
-              ${columnBodyRenderer((_item: any) => html`
+              ${columnBodyRenderer(() => html`
                 <button 
                   style="background:none; border:none; color:#e53935; cursor:pointer;"
-                  @click=${(e: any) => this.deleteWarehouseOrder(e.target.closest('vaadin-grid').selectedItems[0]?.$key)}>
+                  @click=${(e: Event) => {
+                    const grid = (e.target as HTMLElement).closest('vaadin-grid') as any;
+                    const key = grid?.selectedItems?.[0]?.$key;
+                    if (key) {
+                      this.deleteWarehouseOrder(key);
+                    }
+                  }}>
                   <span class="material-symbols-outlined" style="font-size:18px;">delete</span>
                 </button>
               `, [])}

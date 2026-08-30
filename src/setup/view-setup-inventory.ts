@@ -4,7 +4,7 @@ import { consume } from '@lit/context';
 import { ref as dbRef, push, set, remove, update } from 'firebase/database';
 import { db } from '../config/firebase.js';
 import { userContext, UserContextValue } from '../context/userContext.js';
-import { FirebaseQueryController } from '../controllers/FirebaseQueryController.js';
+import { inventoryContext, QueryContextValue } from '../context/dataContexts.js';
 import { DbFolder, getCompanyPath } from '../config/db-paths.js';
 
 // Material Design 3 UI Imports
@@ -209,6 +209,10 @@ export class ViewSetupInventory extends LitElement {
   @state()
   private authState!: UserContextValue;
 
+  @consume({ context: inventoryContext, subscribe: true })
+  @state()
+  private inventoryState!: QueryContextValue<InventoryItem>;
+
   @state() private showEditor = false;
   @state() private editingKey: string | null = null; // null = Add, string = Edit
 
@@ -235,11 +239,6 @@ export class ViewSetupInventory extends LitElement {
       this.showEditor = false;
     }
   }
-
-  // Real-time Queries
-  private inventoryController = new FirebaseQueryController<InventoryItem>(this, () =>
-    this.authState.profile?.key ? getCompanyPath(this.authState.profile.key, DbFolder.FACTORY_INVENTORY) : null
-  );
 
   private openAddDialog() {
     this.editingKey = null;
@@ -331,11 +330,11 @@ export class ViewSetupInventory extends LitElement {
   }
 
   override render() {
-    if (this.inventoryController.loading) {
+    if (this.inventoryState.loading) {
       return html`<p>Loading Inventory Ledger...</p>`;
     }
 
-    const items = this.inventoryController.data;
+    const items = this.inventoryState.data || [];
 
     return html`
       <div class="inventory-workspace">
