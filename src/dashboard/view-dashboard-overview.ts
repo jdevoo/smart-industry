@@ -5,6 +5,7 @@ import { ref as dbRef, update } from 'firebase/database';
 import { db } from '../config/firebase.js';
 import { userContext, UserContextValue } from '../context/userContext.js';
 import { displayDateFromTimestamp } from '../utils/date.js';
+import { DbFolder, getCompanyPath } from '../config/db-paths.js';
 import {
   ordersContext,
   machinesContext,
@@ -195,7 +196,7 @@ export class ViewDashboardOverview extends LitElement {
     if (diff > range) {
       if (this._isResettingInterval) return;
       this._isResettingInterval = true;
-      update(dbRef(db, `/data/${companyKey}/factoryData/schedule`), {
+      update(dbRef(db, getCompanyPath(companyKey, DbFolder.FACTORY_SCHEDULE)), {
         start_interval: current
       })
       .then(() => {

@@ -8,7 +8,7 @@ import { auth, db } from './config/firebase.js';
 import { userContext, UserContextValue, UserProfile } from './context/userContext.js';
 import { FirebaseQueryController } from './controllers/FirebaseQueryController.js';
 import { FirebaseDocController } from './controllers/FirebaseDocController.js';
-import { DbFolder, getCompanyPath } from './config/db-paths.js';
+import { DbFolder, getCompanyPath, getUserProfilePath } from './config/db-paths.js';
 import {
   ordersContext,
   machinesContext,
@@ -518,14 +518,14 @@ export class ViewApp extends LitElement {
 
       if (user) {
         // Setup database listener for profile
-        const userProfileRef = ref(db, `/user/${user.uid}`);
+        const userProfileRef = ref(db, getUserProfilePath(user.uid));
         this.profileUnsubscribe = onValue(userProfileRef, 
           (snapshot) => {
             const profile = snapshot.val() as UserProfile | null;
             
             // Sync user data to corporate workspace directory for Manage Users features
             if (profile && profile.key) {
-              const companyUserRef = ref(db, `/data/${profile.key}/users/${user.uid}`);
+              const companyUserRef = ref(db, getCompanyPath(profile.key, DbFolder.USERS, user.uid));
               update(companyUserRef, {
                 uid: user.uid,
                 displayname: profile.displayname || user.displayName || 'Untitled User',

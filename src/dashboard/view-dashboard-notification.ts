@@ -6,6 +6,7 @@ import { db } from '../config/firebase.js';
 import { userContext, UserContextValue } from '../context/userContext.js';
 import { notificationsContext, QueryContextValue } from '../context/dataContexts.js';
 import { columnBodyRenderer, columnHeaderRenderer } from '@vaadin/grid/lit.js';
+import { DbFolder, getCompanyPath } from '../config/db-paths.js';
 
 // Material Design 3 Imports
 import '@material/web/button/filled-button.js';
@@ -119,7 +120,7 @@ export class ViewDashboardNotification extends LitElement {
 
     if (confirm('Are you sure you want to delete and clear all factory notifications?')) {
       try {
-        await remove(dbRef(db, `/data/${companyKey}/notificationData`));
+        await remove(dbRef(db, getCompanyPath(companyKey, DbFolder.NOTIFICATION_DATA)));
       } catch (err) {
         console.error('Failed to clear notifications', err);
       }

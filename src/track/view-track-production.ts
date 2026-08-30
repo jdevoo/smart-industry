@@ -12,6 +12,7 @@ import {
   machinesContext,
   QueryContextValue
 } from '../context/dataContexts.js';
+import { DbFolder, getCompanyPath } from '../config/db-paths.js';
 
 // Material Design 3 Imports
 import '@material/web/button/filled-button.js';
@@ -364,7 +365,7 @@ export class ViewTrackProduction extends LitElement {
 
     try {
       // 1. Move job status to done and write sensor metrics
-      await update(dbRef(db, `/data/${companyKey}/trackingData/${job.$key}`), {
+      await update(dbRef(db, getCompanyPath(companyKey, DbFolder.TRACKING_DATA, job.$key)), {
         job_status: 'done',
         job_good: job.job_quantity,
         job_defect: 0,
@@ -372,7 +373,7 @@ export class ViewTrackProduction extends LitElement {
       });
 
       // 2. Increment overall daily workspace completed contribution index
-      const commitSnapshot = await get(dbRef(db, `/data/${companyKey}/commitData`));
+      const commitSnapshot = await get(dbRef(db, getCompanyPath(companyKey, DbFolder.COMMIT_DATA)));
       if (commitSnapshot.exists()) {
         const commits = commitSnapshot.val() as unknown as Array<{ date: string; commit: number; level: number }>;
         const todayDateStr = displayDateFromTimestamp(timestamp * 1000);
@@ -380,7 +381,7 @@ export class ViewTrackProduction extends LitElement {
         if (targetDayIdx !== -1) {
           const count = (commits[targetDayIdx].commit || 0) + 1;
           const level = Math.min(4, Math.ceil(count / 5)); // scales up level every 5 completed runs
-          await update(dbRef(db, `/data/${companyKey}/commitData/${targetDayIdx}`), {
+          await update(dbRef(db, getCompanyPath(companyKey, DbFolder.COMMIT_DATA, targetDayIdx.toString())), {
             commit: count,
             level: level
           });
@@ -388,7 +389,7 @@ export class ViewTrackProduction extends LitElement {
       }
 
       // 3. Post a clean logger event to notify operators
-      const notifyRef = push(dbRef(db, `/data/${companyKey}/notificationData`));
+      const notifyRef = push(dbRef(db, getCompanyPath(companyKey, DbFolder.NOTIFICATION_DATA)));
       await set(notifyRef, {
         created: timestamp,
         detail: `Telemetry Event: Sensor automatically completed run #${job.order_no} (${job.job_part}). Recorded ${counterVal} items.`,
@@ -406,7 +407,7 @@ export class ViewTrackProduction extends LitElement {
     const timestamp = Math.round(Date.now() / 1000);
 
     try {
-      await update(dbRef(db, `/data/${companyKey}/trackingData/${job.$key}`), {
+      await update(dbRef(db, getCompanyPath(companyKey, DbFolder.TRACKING_DATA, job.$key)), {
         job_status: 'wip',
         actual_start: timestamp
       });
@@ -429,7 +430,7 @@ export class ViewTrackProduction extends LitElement {
 
     try {
       // 1. Mark job status as done, write reported quantities
-      await update(dbRef(db, `/data/${companyKey}/trackingData/${this.activeJobReportingKey}`), {
+      await update(dbRef(db, getCompanyPath(companyKey, DbFolder.TRACKING_DATA, this.activeJobReportingKey)), {
         job_status: 'done',
         job_good: this.reportingGoodCount,
         job_defect: this.reportingDefectCount,
@@ -437,7 +438,7 @@ export class ViewTrackProduction extends LitElement {
       });
 
       // 2. Increment contribution calendar tally
-      const commitSnapshot = await get(dbRef(db, `/data/${companyKey}/commitData`));
+      const commitSnapshot = await get(dbRef(db, getCompanyPath(companyKey, DbFolder.COMMIT_DATA)));
       if (commitSnapshot.exists()) {
         const commits = commitSnapshot.val() as unknown as Array<{ date: string; commit: number; level: number }>;
         const todayDateStr = displayDateFromTimestamp(timestamp * 1000);
@@ -445,7 +446,7 @@ export class ViewTrackProduction extends LitElement {
         if (targetDayIdx !== -1) {
           const count = (commits[targetDayIdx].commit || 0) + 1;
           const level = Math.min(4, Math.ceil(count / 5));
-          await update(dbRef(db, `/data/${companyKey}/commitData/${targetDayIdx}`), {
+          await update(dbRef(db, getCompanyPath(companyKey, DbFolder.COMMIT_DATA, targetDayIdx.toString())), {
             commit: count,
             level: level
           });
@@ -465,7 +466,7 @@ export class ViewTrackProduction extends LitElement {
 
     if (confirm('Are you sure you want to remove this active job from tracking?')) {
       try {
-        await remove(dbRef(db, `/data/${companyKey}/trackingData/${key}`));
+        await remove(dbRef(db, getCompanyPath(companyKey, DbFolder.TRACKING_DATA, key)));
       } catch (err) {
         console.error('Failed to remove job', err);
       }
@@ -477,7 +478,7 @@ export class ViewTrackProduction extends LitElement {
     if (!companyKey) return;
 
     try {
-      await update(dbRef(db, `/data/${companyKey}/trackingData/${jobKey}`), {
+      await update(dbRef(db, getCompanyPath(companyKey, DbFolder.TRACKING_DATA, jobKey)), {
         job_sensor: sensorName
       });
     } catch (err) {
@@ -490,7 +491,7 @@ export class ViewTrackProduction extends LitElement {
     if (!companyKey) return;
 
     try {
-      await update(dbRef(db, `/data/${companyKey}/factoryData/device/${deviceKey}`), {
+      await update(dbRef(db, getCompanyPath(companyKey, DbFolder.FACTORY_DEVICE, deviceKey)), {
         counter: 0,
         update: Math.round(Date.now() / 1000)
       });
@@ -505,7 +506,7 @@ export class ViewTrackProduction extends LitElement {
 
     if (confirm('Are you sure you want to delete and unregister this IoT tracker device?')) {
       try {
-        await remove(dbRef(db, `/data/${companyKey}/factoryData/device/${deviceKey}`));
+        await remove(dbRef(db, getCompanyPath(companyKey, DbFolder.FACTORY_DEVICE, deviceKey)));
       } catch (err) {
         console.error('Error removing device', err);
       }
@@ -531,7 +532,7 @@ export class ViewTrackProduction extends LitElement {
     };
 
     try {
-      const devicesRef = dbRef(db, `/data/${companyKey}/factoryData/device`);
+      const devicesRef = dbRef(db, getCompanyPath(companyKey, DbFolder.FACTORY_DEVICE));
       const newDeviceRef = push(devicesRef);
       await set(newDeviceRef, payload);
 

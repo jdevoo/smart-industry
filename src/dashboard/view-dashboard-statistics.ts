@@ -6,6 +6,7 @@ import { db } from '../config/firebase.js';
 import { userContext, UserContextValue } from '../context/userContext.js';
 import { isLeapYear, dateFromDays } from '../utils/date.js';
 import { historyContext, commitContext, QueryContextValue, DocContextValue } from '../context/dataContexts.js';
+import { DbFolder, getCompanyPath } from '../config/db-paths.js';
 
 interface ArchivedOrderItem {
   order_product?: string;
@@ -261,7 +262,7 @@ export class ViewDashboardStatistics extends LitElement {
 
     if (confirm('Are you sure you want to reset order statistics charts?')) {
       try {
-        await remove(dbRef(db, `/data/${companyKey}/historyData/order`));
+        await remove(dbRef(db, getCompanyPath(companyKey, DbFolder.HISTORY_DATA, 'order')));
         if (this.chart) this.chart.destroy();
       } catch (err) {
         console.error('Reset order statistics error', err);
@@ -283,7 +284,7 @@ export class ViewDashboardStatistics extends LitElement {
           dayno: i + 1,
           date: dateFromDays(i + 1)
         }));
-        await set(dbRef(db, `/data/${companyKey}/commitData`), freshCommits);
+        await set(dbRef(db, getCompanyPath(companyKey, DbFolder.COMMIT_DATA)), freshCommits);
       } catch (err) {
         console.error('Reset work statistics error', err);
       }
