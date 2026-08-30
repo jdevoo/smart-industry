@@ -161,10 +161,12 @@ export class ViewPlanScheduling extends LitElement {
     /* Station buttons row */
     .stations-row {
       display: flex;
+      flex-wrap: wrap;
       gap: 8px;
       margin-bottom: 16px;
-      overflow-x: auto;
-      scrollbar-width: none;
+      width: 100%;
+      max-width: 100%;
+      box-sizing: border-box;
     }
     .stations-row::-webkit-scrollbar {
       display: none;
@@ -667,7 +669,7 @@ export class ViewPlanScheduling extends LitElement {
 
         <!-- 2. Computed Job timeline list card -->
         <div class="ledger-card">
-          <div class="card-header" style="flex-direction: column; align-items: flex-start; gap: 12px; margin-bottom: 20px;">
+          <div class="card-header" style="flex-direction: column; align-items: stretch; gap: 12px; margin-bottom: 20px;">
             <h3 class="card-title">Live Dispatched Jobs Sequence</h3>
             
             <!-- Stations Selector row -->

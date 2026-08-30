@@ -99,10 +99,12 @@ export class ViewTrackProduction extends LitElement {
     /* Stations selector row */
     .stations-row {
       display: flex;
+      flex-wrap: wrap;
       gap: 8px;
       margin-bottom: 24px;
-      overflow-x: auto;
-      scrollbar-width: none;
+      width: 100%;
+      max-width: 100%;
+      box-sizing: border-box;
     }
     .stations-row::-webkit-scrollbar {
       display: none;
