@@ -72,6 +72,7 @@ export class ViewPlanProduction extends LitElement {
       height: 480px;
       padding: 16px;
       position: relative;
+      box-sizing: border-box;
     }
 
     .simulation-dashboard {
@@ -211,6 +212,27 @@ export class ViewPlanProduction extends LitElement {
       box-sizing: border-box;
     }
 
+    @media (max-width: 840px) {
+      .simulator-frame {
+        height: auto;
+        min-height: 320px;
+      }
+      .simulation-dashboard {
+        flex-direction: column-reverse;
+        height: auto;
+        overflow: visible;
+      }
+      .simulation-hud {
+        width: 100%;
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+        gap: 12px;
+      }
+      .factory-floor {
+        max-height: 360px;
+      }
+    }
+
     .hud-item {
       display: flex;
       flex-direction: column;
@@ -276,7 +298,10 @@ export class ViewPlanProduction extends LitElement {
       display: flex;
       align-items: center;
       justify-content: space-between;
-      gap: 24px;
+      gap: 16px;
+      flex-wrap: wrap;
+      width: 100%;
+      box-sizing: border-box;
     }
 
     .scrub-track-container {
@@ -284,6 +309,8 @@ export class ViewPlanProduction extends LitElement {
       align-items: center;
       gap: 12px;
       flex: 1;
+      width: 100%;
+      min-width: 0;
     }
 
     .slider-input {
@@ -294,6 +321,7 @@ export class ViewPlanProduction extends LitElement {
       background-color: #eee;
       -webkit-appearance: none;
       cursor: pointer;
+      min-width: 60px;
     }
     .slider-input::-webkit-slider-thumb {
       -webkit-appearance: none;
@@ -316,23 +344,12 @@ export class ViewPlanProduction extends LitElement {
     .btn-group {
       display: flex;
       flex-wrap: wrap;
-      justify-content: center;
+      align-items: center;
       gap: 12px;
-      width: 100%;
-      box-sizing: border-box;
     }
     .btn-group md-outlined-button,
     .btn-group md-filled-button {
       max-width: 100%;
-    }
-    @media (max-width: 600px) {
-      .btn-group {
-        flex-direction: column;
-      }
-      .btn-group md-outlined-button,
-      .btn-group md-filled-button {
-        width: 100%;
-      }
     }
 
     .slider-row {
@@ -341,6 +358,31 @@ export class ViewPlanProduction extends LitElement {
       gap: 12px;
       font-size: 0.85rem;
       color: #444;
+      flex-wrap: wrap;
+    }
+
+    @media (max-width: 768px) {
+      .playback-row {
+        flex-direction: column;
+        align-items: stretch;
+      }
+      .btn-group {
+        width: 100%;
+        justify-content: center;
+      }
+      .btn-group md-outlined-button,
+      .btn-group md-filled-button {
+        flex: 1;
+        min-width: 120px;
+      }
+      .slider-row {
+        width: 100%;
+        justify-content: center;
+      }
+      .slider-row .slider-input {
+        flex: 1;
+        min-width: 80px;
+      }
     }
 
     [hidden] {
