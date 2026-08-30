@@ -315,8 +315,24 @@ export class ViewPlanProduction extends LitElement {
 
     .btn-group {
       display: flex;
+      flex-wrap: wrap;
       justify-content: center;
       gap: 12px;
+      width: 100%;
+      box-sizing: border-box;
+    }
+    .btn-group md-outlined-button,
+    .btn-group md-filled-button {
+      max-width: 100%;
+    }
+    @media (max-width: 600px) {
+      .btn-group {
+        flex-direction: column;
+      }
+      .btn-group md-outlined-button,
+      .btn-group md-filled-button {
+        width: 100%;
+      }
     }
 
     .slider-row {
