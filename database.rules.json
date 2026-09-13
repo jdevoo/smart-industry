@@ -4,6 +4,20 @@
     ".read": false,
     ".write": false,
 
+    "system": {
+      // System metadata (e.g. super admin reference)
+      ".read": true,
+      ".write": "auth != null"
+    },
+
+    "factories": {
+      // Factory registry: readable so users can see/validate factory keys during onboarding
+      ".read": true,
+      "$factoryKey": {
+        ".write": "auth != null"
+      }
+    },
+
     "user": {
       "$uid": {
         // Users can only read and write their own profile details

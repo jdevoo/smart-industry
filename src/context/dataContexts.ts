@@ -25,6 +25,8 @@ export interface FactoryProfileData {
   model?: string;
   concurrency?: string | number;
   setup?: boolean;
+  admin_uid?: string;
+  created_by?: string;
 }
 
 export interface OperationConfigData {

@@ -43,3 +43,17 @@ export function getCompanyPath(companyKey: string, folder: DbFolder | string, su
 export function getUserProfilePath(uid: string): string {
   return `/user/${uid}`;
 }
+
+/**
+ * Builds the factory registry directory path.
+ */
+export function getFactoriesPath(factoryKey?: string): string {
+  return factoryKey ? `/factories/${factoryKey}` : '/factories';
+}
+
+/**
+ * Builds the global system metadata path.
+ */
+export function getSystemPath(): string {
+  return '/system';
+}

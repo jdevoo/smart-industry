@@ -11,6 +11,8 @@ export interface UserProfile {
   phone: string;
   role: string;
   setup: boolean;
+  factoryName?: string;
+  isSuperAdmin?: boolean;
 }
 
 export interface UserContextValue {

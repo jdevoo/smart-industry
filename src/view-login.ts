@@ -1,14 +1,25 @@
 import { LitElement, html, css } from 'lit';
 import { customElement, state } from 'lit/decorators.js';
 import { signInWithEmailAndPassword, createUserWithEmailAndPassword, sendPasswordResetEmail, updateProfile, sendEmailVerification } from 'firebase/auth';
-import { ref as dbRef, push, set } from 'firebase/database';
+import { ref as dbRef, push, set, get, onValue, update } from 'firebase/database';
 import { auth, db } from './config/firebase.js';
+import { getFactoriesPath, getSystemPath } from './config/db-paths.js';
 
 // Import Material 3 Components
 import '@material/web/textfield/outlined-text-field.js';
 import '@material/web/button/filled-button.js';
 import '@material/web/button/outlined-button.js';
 import '@material/web/checkbox/checkbox.js';
+import '@material/web/select/outlined-select.js';
+import '@material/web/select/select-option.js';
+import '@material/web/icon/icon.js';
+
+export interface AvailableFactory {
+  key: string;
+  name: string;
+  company: string;
+  admin_uid: string | null;
+}
 
 @customElement('view-login')
 export class ViewLogin extends LitElement {
@@ -48,6 +59,7 @@ export class ViewLogin extends LitElement {
       font-size: 1.80rem;
       font-weight: 500;
       color: #202020;
+      margin: 0;
     }
     .form-title p {
       color: #666;
@@ -60,7 +72,7 @@ export class ViewLogin extends LitElement {
       gap: 16px;
       margin-bottom: 20px;
     }
-    md-outlined-text-field {
+    md-outlined-text-field, md-outlined-select {
       width: 100%;
     }
     .checkbox-container {
@@ -106,6 +118,38 @@ export class ViewLogin extends LitElement {
       color: #2e7d32;
       border: 1px solid #c3e6cb;
     }
+    .role-indicator {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      padding: 12px 16px;
+      border-radius: 8px;
+      font-size: 0.88rem;
+    }
+    .role-indicator md-icon {
+      font-size: 24px;
+      --md-icon-size: 24px;
+      flex-shrink: 0;
+    }
+    .role-indicator.admin {
+      background-color: #eafaf1;
+      border: 1px solid #c3e6cb;
+      color: #155724;
+    }
+    .role-indicator.operator {
+      background-color: #e8f4fd;
+      border: 1px solid #b8daff;
+      color: #004085;
+    }
+    .role-indicator-title {
+      font-weight: 500;
+      margin-bottom: 2px;
+    }
+    .role-indicator-desc {
+      font-size: 0.80rem;
+      opacity: 0.9;
+      line-height: 1.3;
+    }
     form {
       display: contents;
     }
@@ -119,8 +163,63 @@ export class ViewLogin extends LitElement {
   // Form Field States
   @state() private email = '';
   @state() private password = '';
+  @state() private displayName = '';
   @state() private company = '';
+  @state() private factoryName = '';
   @state() private phone = '';
+
+  // Factory Directory States
+  @state() private availableFactories: AvailableFactory[] = [];
+  @state() private selectedFactoryKey = '';
+  @state() private customKeychainKey = '';
+
+  private factoriesUnsubscribe: (() => void) | null = null;
+
+  override connectedCallback() {
+    super.connectedCallback();
+    this.listenFactories();
+  }
+
+  override disconnectedCallback() {
+    if (this.factoriesUnsubscribe) {
+      this.factoriesUnsubscribe();
+      this.factoriesUnsubscribe = null;
+    }
+    super.disconnectedCallback();
+  }
+
+  private listenFactories() {
+    const factoriesRef = dbRef(db, getFactoriesPath());
+    this.factoriesUnsubscribe = onValue(factoriesRef, (snapshot) => {
+      const data = snapshot.val();
+      if (data) {
+        this.availableFactories = Object.entries(data).map(([k, v]: [string, any]) => ({
+          key: k,
+          name: v.name || v.company || k,
+          company: v.company || 'Company',
+          admin_uid: v.admin_uid || null
+        }));
+        if (!this.selectedFactoryKey && this.availableFactories.length > 0) {
+          this.selectedFactoryKey = this.availableFactories[0].key;
+        }
+      } else {
+        this.availableFactories = [];
+      }
+    }, () => {
+    });
+  }
+
+  private get selectedFactory(): AvailableFactory | undefined {
+    const key = this.selectedFactoryKey === 'custom' ? this.customKeychainKey.trim() : this.selectedFactoryKey;
+    return this.availableFactories.find(f => f.key === key);
+  }
+
+  private get prospectiveRole(): 'admin' | 'operator' {
+    if (this.availableFactories.length === 0) return 'admin';
+    const factory = this.selectedFactory;
+    if (!factory) return 'operator';
+    return factory.admin_uid ? 'operator' : 'admin';
+  }
 
   private _handleKeyDown(e: KeyboardEvent) {
     if (e.key === 'Enter') {
@@ -159,7 +258,6 @@ export class ViewLogin extends LitElement {
 
     try {
       await signInWithEmailAndPassword(auth, this.email, this.password);
-      // Route transition event or handled by router state change
       this.dispatchEvent(new CustomEvent('auth-success', { bubbles: true, composed: true }));
     } catch (err: any) {
       this.errorMsg = this.getReadableError(err.code);
@@ -168,54 +266,148 @@ export class ViewLogin extends LitElement {
 
   private async register() {
     this.clearAlerts();
-    if (!this.email || !this.password || !this.company || !this.phone) {
-      this.errorMsg = 'Please fill in the registration form completely.';
+    if (!this.email || !this.password || !this.phone) {
+      this.errorMsg = 'Please fill in all required registration fields.';
       return;
     }
 
+    const isInitialBootstrap = this.availableFactories.length === 0;
+
+    let targetKey = '';
+    let targetCompany = '';
+    let targetFactoryName = '';
+    let willBeAdmin = false;
+
+    if (isInitialBootstrap) {
+      if (!this.company || !this.factoryName) {
+        this.errorMsg = 'Please provide both Company Name and Factory Name for initial setup.';
+        return;
+      }
+      willBeAdmin = true;
+      targetCompany = this.company.trim();
+      targetFactoryName = this.factoryName.trim();
+    } else {
+      const chosenKey = this.selectedFactoryKey === 'custom' ? this.customKeychainKey.trim() : this.selectedFactoryKey;
+      if (!chosenKey) {
+        this.errorMsg = 'Please select a factory or enter a Factory Keychain ID.';
+        return;
+      }
+
+      let factory = this.availableFactories.find(f => f.key === chosenKey);
+      if (!factory) {
+        try {
+          const snap = await get(dbRef(db, getFactoriesPath(chosenKey)));
+          if (snap.exists()) {
+            const val = snap.val();
+            factory = {
+              key: chosenKey,
+              name: val.name || val.company || chosenKey,
+              company: val.company || 'Company',
+              admin_uid: val.admin_uid || null
+            };
+          }
+        } catch {
+          // ignore
+        }
+      }
+
+      if (!factory) {
+        this.errorMsg = 'Invalid Factory Keychain ID. Please check with your administrator.';
+        return;
+      }
+
+      targetKey = factory.key;
+      targetCompany = factory.company;
+      targetFactoryName = factory.name;
+      willBeAdmin = !factory.admin_uid;
+    }
+
     try {
-      // Fetch sample database layout using fetch API
-      const sampleRes = await fetch('/data/sample/sample.json');
-      if (!sampleRes.ok) throw new Error('Could not load startup database profile');
-      const sampleData = await sampleRes.json();
+      let sampleData: any = null;
+      if (isInitialBootstrap) {
+        const sampleRes = await fetch('/data/sample/sample.json');
+        if (!sampleRes.ok) throw new Error('Could not load startup database profile');
+        sampleData = await sampleRes.json();
+        if (sampleData.factoryData && sampleData.factoryData.profile) {
+          sampleData.factoryData.profile.name = targetFactoryName;
+        }
+      }
 
       // Create Firebase Auth user
       const userCredential = await createUserWithEmailAndPassword(auth, this.email, this.password);
       const user = userCredential.user;
 
-      // Update Profile Details
+      const userDisplayName = this.displayName.trim() || (willBeAdmin ? 'Factory Admin' : 'Operator');
+
       await updateProfile(user, {
-        displayName: 'Untitled'
+        displayName: userDisplayName
       });
 
-      // Send Verification Email
       await sendEmailVerification(user);
 
-      // Create new Factory Company ID Node inside Realtime Database
-      const factoryDataRef = dbRef(db, '/data');
-      const newCompanyRef = push(factoryDataRef);
-      const keyid = newCompanyRef.key;
+      if (isInitialBootstrap) {
+        const factoryDataRef = dbRef(db, '/data');
+        const newCompanyRef = push(factoryDataRef);
+        targetKey = newCompanyRef.key!;
+        if (!targetKey) throw new Error('Failed to generate company key ID');
 
-      if (!keyid) throw new Error('Failed to generate company key ID');
+        await set(newCompanyRef, sampleData);
 
-      // Seed setup profile
+        await set(dbRef(db, getSystemPath()), {
+          super_admin_uid: user.uid,
+          created_at: Date.now()
+        });
+      }
+
+      // Update factory registry
+      const factoryRecordRef = dbRef(db, getFactoriesPath(targetKey));
+      if (isInitialBootstrap) {
+        await set(factoryRecordRef, {
+          key: targetKey,
+          name: targetFactoryName,
+          company: targetCompany,
+          admin_uid: user.uid,
+          created_by: user.uid,
+          created_at: Date.now()
+        });
+      } else if (willBeAdmin) {
+        await update(factoryRecordRef, {
+          admin_uid: user.uid
+        });
+        await update(dbRef(db, `/data/${targetKey}/factoryData/profile`), {
+          admin_uid: user.uid
+        }).catch(() => {});
+      }
+
+      const assignedRole = willBeAdmin ? 'admin' : 'operator';
+
+      // Seed personal user profile
       const userProfileRef = dbRef(db, `/user/${user.uid}`);
       await set(userProfileRef, {
-        company: this.company,
+        company: targetCompany,
+        factoryName: targetFactoryName,
         created: Math.round(Date.now() / 1000),
-        displayname: 'Untitled',
+        displayname: userDisplayName,
         email: this.email,
-        key: keyid,
+        key: targetKey,
         photoURL: null,
         phone: this.phone,
-        role: 'admin',
+        role: assignedRole,
+        isSuperAdmin: isInitialBootstrap,
         setup: false
       });
 
-      // Seed factory with sample metadata structure
-      await set(newCompanyRef, sampleData);
+      // Synchronize to factory users list
+      const companyUserRef = dbRef(db, `/data/${targetKey}/users/${user.uid}`);
+      await set(companyUserRef, {
+        uid: user.uid,
+        displayname: userDisplayName,
+        email: this.email,
+        role: assignedRole,
+        photoURL: null
+      });
 
-      this.successMsg = "Register successful. We've sent an activation confirmation link to your inbox.";
+      this.successMsg = `Registration successful as ${assignedRole.toUpperCase()} for "${targetFactoryName}". An activation link was sent to your email.`;
       this.currentForm = 'login';
     } catch (err: any) {
       this.errorMsg = err.message || this.getReadableError(err.code);
@@ -311,12 +503,85 @@ export class ViewLogin extends LitElement {
   }
 
   private renderRegisterForm() {
+    const isInitialBootstrap = this.availableFactories.length === 0;
+
     return html`
       <form @submit=${this._handleRegisterSubmit} @keydown=${this._handleKeyDown}>
         <div class="form-title">
-          <h2>Register Company</h2>
+          <h2>${isInitialBootstrap ? 'Register First Factory' : 'Join Factory'}</h2>
+          <p>${isInitialBootstrap ? 'Initial system setup: Create your organization & factory as Administrator.' : 'Sign up to access your factory workspace.'}</p>
         </div>
+
         <div class="form-group">
+          ${isInitialBootstrap ? html`
+            <div class="role-indicator admin">
+              <md-icon>admin_panel_settings</md-icon>
+              <div>
+                <div class="role-indicator-title">Platform & Factory Administrator</div>
+                <div class="role-indicator-desc">Initial system setup. You will be the primary owner and manage factories.</div>
+              </div>
+            </div>
+
+            <md-outlined-text-field
+              label="Company Name"
+              .value=${this.company}
+              @input=${(e: Event) => this.company = (e.target as HTMLInputElement).value}
+              required>
+            </md-outlined-text-field>
+            <md-outlined-text-field
+              label="Factory Name"
+              .value=${this.factoryName}
+              @input=${(e: Event) => this.factoryName = (e.target as HTMLInputElement).value}
+              required>
+            </md-outlined-text-field>
+          ` : html`
+            <md-outlined-select
+              label="Select Factory Workspace"
+              .value=${this.selectedFactoryKey}
+              @change=${(e: Event) => this.selectedFactoryKey = (e.target as HTMLSelectElement).value}>
+              ${this.availableFactories.map(f => html`
+                <md-select-option value="${f.key}">
+                  <div slot="headline">${f.name} (${f.company})</div>
+                  <div slot="supporting-text">${f.admin_uid ? 'Admin Assigned • Operator Role' : 'No Admin • You will be Admin'}</div>
+                </md-select-option>
+              `)}
+              <md-select-option value="custom">
+                <div slot="headline">Enter Keychain ID Manually...</div>
+              </md-select-option>
+            </md-outlined-select>
+
+            ${this.selectedFactoryKey === 'custom' ? html`
+              <md-outlined-text-field
+                label="Factory Keychain ID"
+                .value=${this.customKeychainKey}
+                @input=${(e: Event) => this.customKeychainKey = (e.target as HTMLInputElement).value}
+                helperText="Paste the Keychain ID provided by your factory administrator"
+                required>
+              </md-outlined-text-field>
+            ` : ''}
+
+            <div class="role-indicator ${this.prospectiveRole === 'admin' ? 'admin' : 'operator'}">
+              <md-icon>${this.prospectiveRole === 'admin' ? 'stars' : 'badge'}</md-icon>
+              <div>
+                <div class="role-indicator-title">
+                  Role: <strong>${this.prospectiveRole === 'admin' ? 'Factory Administrator' : 'Factory Operator'}</strong>
+                </div>
+                <div class="role-indicator-desc">
+                  ${this.prospectiveRole === 'admin' 
+                    ? 'First user for this factory. You will manage topology, orders, and operators.' 
+                    : 'An administrator is already managing this factory. You will join with Operator permissions.'}
+                </div>
+              </div>
+            </div>
+          `}
+
+          <md-outlined-text-field
+            label="Full Name / Display Name"
+            .value=${this.displayName}
+            @input=${(e: Event) => this.displayName = (e.target as HTMLInputElement).value}
+            required>
+          </md-outlined-text-field>
+
           <md-outlined-text-field
             label="Email address"
             type="email"
@@ -329,12 +594,6 @@ export class ViewLogin extends LitElement {
             type="password"
             .value=${this.password}
             @input=${(e: Event) => this.password = (e.target as HTMLInputElement).value}
-            required>
-          </md-outlined-text-field>
-          <md-outlined-text-field
-            label="Company name"
-            .value=${this.company}
-            @input=${(e: Event) => this.company = (e.target as HTMLInputElement).value}
             required>
           </md-outlined-text-field>
           <md-outlined-text-field

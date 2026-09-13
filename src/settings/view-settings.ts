@@ -1,13 +1,13 @@
 import { LitElement, html, css } from 'lit';
 import { customElement, state } from 'lit/decorators.js';
 import { consume } from '@lit/context';
-import { ref as dbRef, update, set, get, remove } from 'firebase/database';
+import { ref as dbRef, update, set, get, remove, push } from 'firebase/database';
 import { updateProfile, updateEmail, updatePassword, sendEmailVerification, EmailAuthProvider, reauthenticateWithCredential, deleteUser } from 'firebase/auth';
 import { db } from '../config/firebase.js';
 import { userContext, UserContextValue } from '../context/userContext.js';
-import { companyUsersContext, QueryContextValue, CompanyUserData } from '../context/dataContexts.js';
+import { companyUsersContext, QueryContextValue, CompanyUserData, factoryProfileContext, DocContextValue, FactoryProfileData } from '../context/dataContexts.js';
 import { FirebaseDocController } from '../controllers/FirebaseDocController.js';
-import { DbFolder, getCompanyPath, getUserProfilePath } from '../config/db-paths.js';
+import { DbFolder, getCompanyPath, getUserProfilePath, getFactoriesPath } from '../config/db-paths.js';
 
 // Material Design 3 Imports
 import '@material/web/textfield/outlined-text-field.js';
@@ -49,7 +49,7 @@ export class ViewSettings extends LitElement {
       border-bottom: 1px solid rgba(0,0,0,0.05);
       padding-bottom: 12px;
     }
-    md-outlined-text-field {
+    md-outlined-text-field, md-outlined-select {
       width: 100%;
     }
     .toggle-row {
@@ -149,6 +149,49 @@ export class ViewSettings extends LitElement {
       padding-top: 16px;
     }
 
+    /* Keychain Info Box */
+    .keychain-box {
+      font-size: 0.85rem;
+      color: #444;
+      line-height: 1.6;
+      background: #f7f9fa;
+      border-radius: 8px;
+      border: 1px solid rgba(0, 0, 0, 0.06);
+      padding: 12px;
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+    }
+    .keychain-key-display {
+      font-family: monospace;
+      font-size: 0.88rem;
+      background: #eef2f5;
+      padding: 4px 8px;
+      border-radius: 4px;
+      word-break: break-all;
+      color: #202020;
+    }
+    .role-badge {
+      font-size: 0.68rem;
+      font-weight: 600;
+      letter-spacing: 0.5px;
+      padding: 2px 8px;
+      border-radius: 10px;
+      text-transform: uppercase;
+      display: inline-block;
+      width: fit-content;
+    }
+    .role-badge.admin {
+      background: #e8f5e9;
+      color: #2e7d32;
+      border: 1px solid #c8e6c9;
+    }
+    .role-badge.operator {
+      background: #e3f2fd;
+      color: #1565c0;
+      border: 1px solid #bbdefb;
+    }
+
     /* Manage Users List */
     .users-list {
       display: flex;
@@ -204,8 +247,18 @@ export class ViewSettings extends LitElement {
   @state()
   private authState!: UserContextValue;
 
+  @consume({ context: factoryProfileContext, subscribe: true })
+  @state()
+  private factoryProfileState!: DocContextValue<FactoryProfileData>;
+
+  @consume({ context: companyUsersContext, subscribe: true })
+  @state()
+  private companyUsersState!: QueryContextValue<CompanyUserData>;
+
+  // Dialog Visibility States
   @state() private showKeychainDialog = false;
   @state() private showManageUsersDialog = false;
+  @state() private showNewFactoryDialog = false;
 
   // WebUSB Devices lists
   @state() private foundDevices: string[] = [];
@@ -225,12 +278,9 @@ export class ViewSettings extends LitElement {
 
   private _handleEscKey(e: KeyboardEvent) {
     if (e.key === 'Escape') {
-      if (this.showKeychainDialog) {
-        this.showKeychainDialog = false;
-      }
-      if (this.showManageUsersDialog) {
-        this.showManageUsersDialog = false;
-      }
+      if (this.showKeychainDialog) this.showKeychainDialog = false;
+      if (this.showManageUsersDialog) this.showManageUsersDialog = false;
+      if (this.showNewFactoryDialog) this.showNewFactoryDialog = false;
     }
   }
 
@@ -242,10 +292,12 @@ export class ViewSettings extends LitElement {
   @state() private editCurrentPassword = '';
   @state() private editNewPassword = '';
   @state() private editCompany = '';
+  @state() private editFactoryName = '';
 
-  @consume({ context: companyUsersContext, subscribe: true })
-  @state()
-  private companyUsersState!: QueryContextValue<CompanyUserData>;
+  // Provision New Factory Fields
+  @state() private newFactoryName = '';
+  @state() private newFactoryCompany = '';
+  @state() private newFactoryModel = 'serial';
 
   // App Data customisations
   private appDataController = new FirebaseDocController(this, () =>
@@ -255,6 +307,7 @@ export class ViewSettings extends LitElement {
   override updated() {
     const user = this.authState.user;
     const profile = this.authState.profile;
+    const factoryProfile = this.factoryProfileState?.data;
 
     if (user && !this.editEmail) {
       this.editDisplayName = user.displayName || '';
@@ -262,6 +315,9 @@ export class ViewSettings extends LitElement {
     }
     if (profile && !this.editCompany) {
       this.editCompany = profile.company || '';
+    }
+    if ((factoryProfile?.name || profile?.factoryName) && !this.editFactoryName) {
+      this.editFactoryName = factoryProfile?.name || profile?.factoryName || '';
     }
   }
 
@@ -273,15 +329,15 @@ export class ViewSettings extends LitElement {
     alert(msg);
   }
 
-  // --- 1. General Settings (Sensors and Language) ---
+  // --- 1. General Settings (Sensors and Calculations) ---
 
   private async scanDevice() {
     if ('usb' in navigator) {
       try {
         const device = await (navigator as any).usb.requestDevice({
           filters: [
-            { vendorId: 0x2341 }, // Arduino
-            { vendorId: 0x2a03 }  // Arduino LLC
+            { vendorId: 0x2341 },
+            { vendorId: 0x2a03 }
           ]
         });
         const name = device.productName || `USB Device (${device.vendorId.toString(16)})`;
@@ -293,7 +349,7 @@ export class ViewSettings extends LitElement {
         }
       }
     } else {
-      alert('Your web browser does not support physical device detection. Please use Google Chrome');
+      alert('Your web browser does not support physical device detection. Please use Google Chrome.');
     }
   }
 
@@ -311,7 +367,7 @@ export class ViewSettings extends LitElement {
         this.triggerError(err.message);
       }
     } else {
-      alert('Your web browser does not support physical device detection. Please use Google Chrome');
+      alert('Your web browser does not support physical device detection. Please use Google Chrome.');
     }
   }
 
@@ -342,7 +398,7 @@ export class ViewSettings extends LitElement {
     }
   }
 
-  // --- 2. Account Preferences (Profile Details, Images & Erasures) ---
+  // --- 2. Account Preferences ---
 
   private triggerProfileImageUpload() {
     const fileInput = this.shadowRoot?.getElementById('profileImageInput') as HTMLInputElement;
@@ -359,7 +415,7 @@ export class ViewSettings extends LitElement {
       return;
     }
 
-    if (file.size > 1024 * 1024) { // 1MB limit
+    if (file.size > 1024 * 1024) {
       this.triggerError('File size exceeds the 1MB limit.');
       return;
     }
@@ -411,13 +467,8 @@ export class ViewSettings extends LitElement {
         const credential = EmailAuthProvider.credential(user.email || '', password);
         await reauthenticateWithCredential(user, credential);
 
-        // 1. Remove this user from the company members list
         await remove(dbRef(db, getCompanyPath(companyKey, DbFolder.USERS, user.uid)));
-
-        // 2. Wipe the personal user routing profile references
         await remove(dbRef(db, getUserProfilePath(user.uid)));
-
-        // 3. Delete the authentication credentials from Firebase
         await deleteUser(user);
 
         alert('Your personal profile account was successfully deleted.');
@@ -444,7 +495,7 @@ export class ViewSettings extends LitElement {
     }
   }
 
-  // --- 3. Authentication Settings (Emails & Password Mutators) ---
+  // --- 3. Authentication Settings ---
 
   private async changeEmail() {
     const user = this.authState.user;
@@ -586,21 +637,55 @@ export class ViewSettings extends LitElement {
     }
   }
 
-  // --- 6. Organization Layout & Team Members ---
+  // --- 6. Factory & Organization Layout & Team Members ---
 
-  private async openManageUsers() {
+  private copyKeychain() {
+    const key = this.authState.profile?.key;
+    if (!key) return;
+    if (navigator.clipboard) {
+      navigator.clipboard.writeText(key).then(() => {
+        alert(`Keychain ID copied to clipboard!\n\nKey: ${key}\n\nShare this key with new members so they can join your factory as Operators.`);
+      }).catch(() => {
+        prompt('Copy this Factory Keychain ID:', key);
+      });
+    } else {
+      prompt('Copy this Factory Keychain ID:', key);
+    }
+  }
+
+  private openManageUsers() {
     this.showManageUsersDialog = true;
   }
 
-  private async changeUserRole(uid: string, newRole: string) {
+  private async transferAdminOwnership(targetUid: string, targetName: string) {
+    const currentUser = this.authState.user;
     const companyKey = this.authState.profile?.key;
-    if (!companyKey) return;
+    if (!currentUser || !companyKey) return;
+
+    if (!confirm(`Are you sure you want to transfer Administrator ownership to ${targetName}?\n\n• ${targetName} will become the sole Factory Administrator.\n• You will step down to Factory Operator.\n\nOnly one Administrator is allowed per factory.`)) {
+      return;
+    }
 
     try {
-      await update(dbRef(db, getCompanyPath(companyKey, DbFolder.USERS, uid)), { role: newRole });
-      this.triggerSuccess('User member role modified successfully.');
+      // 1. Promote target to admin in company directory
+      await update(dbRef(db, getCompanyPath(companyKey, DbFolder.USERS, targetUid)), { role: 'admin' });
+      // 2. Promote target in user profile (if permitted)
+      await update(dbRef(db, getUserProfilePath(targetUid)), { role: 'admin' }).catch(() => {});
+      
+      // 3. Demote current user to operator in company directory
+      await update(dbRef(db, getCompanyPath(companyKey, DbFolder.USERS, currentUser.uid)), { role: 'operator' });
+      // 4. Demote current user in user profile
+      await update(dbRef(db, getUserProfilePath(currentUser.uid)), { role: 'operator' });
+
+      // 5. Update factory registry admin_uid
+      await update(dbRef(db, getFactoriesPath(companyKey)), { admin_uid: targetUid }).catch(() => {});
+      await update(dbRef(db, `/data/${companyKey}/factoryData/profile`), { admin_uid: targetUid }).catch(() => {});
+
+      this.triggerSuccess(`Ownership transferred successfully. ${targetName} is now the Factory Administrator.`);
+      this.showManageUsersDialog = false;
+      setTimeout(() => window.location.reload(), 1200);
     } catch (err: any) {
-      this.triggerError(err.message);
+      this.triggerError(`Failed to transfer ownership: ${err.message}`);
     }
   }
 
@@ -608,10 +693,10 @@ export class ViewSettings extends LitElement {
     const companyKey = this.authState.profile?.key;
     if (!companyKey) return;
 
-    if (confirm('Are you sure you want to remove this user from your company? They will lose access to all factory data.')) {
+    if (confirm('Are you sure you want to remove this user from this factory? They will lose access to all factory data.')) {
       try {
         await remove(dbRef(db, getCompanyPath(companyKey, DbFolder.USERS, uid)));
-        this.triggerSuccess('User successfully unlinked from company silo.');
+        this.triggerSuccess('User successfully unlinked from factory silo.');
       } catch (err: any) {
         this.triggerError(err.message);
       }
@@ -630,7 +715,7 @@ export class ViewSettings extends LitElement {
     try {
       const testSnapshot = await get(dbRef(db, getCompanyPath(this.newKeychainKey, DbFolder.FACTORY_PROFILE)));
       if (!testSnapshot.exists()) {
-        alert('Keychain Error: Target keychain references an empty or invalid company profile.');
+        alert('Keychain Error: Target keychain references an empty or invalid factory workspace.');
         return;
       }
 
@@ -639,23 +724,92 @@ export class ViewSettings extends LitElement {
       
       this.showKeychainDialog = false;
       this.triggerSuccess('Keychain switched successfully. Reloading view workspace...');
-      setTimeout(() => window.location.reload(), 1500);
+      setTimeout(() => window.location.reload(), 1200);
     } catch (err: any) {
       this.triggerError(err.message);
     }
   }
 
-  private async saveOrganizationSettings() {
+  private openProvisionNewFactory() {
+    this.newFactoryCompany = this.editCompany || '';
+    this.newFactoryName = '';
+    this.newFactoryModel = 'serial';
+    this.showNewFactoryDialog = true;
+  }
+
+  private async submitNewFactory() {
+    const user = this.authState.user;
+    if (!user) return;
+
+    if (!this.newFactoryName.trim() || !this.newFactoryCompany.trim()) {
+      alert('Please fill in both Factory Name and Company Name.');
+      return;
+    }
+
+    try {
+      const sampleRes = await fetch('/data/sample/sample.json');
+      if (!sampleRes.ok) throw new Error('Could not load startup database profile');
+      const sampleData = await sampleRes.json();
+
+      if (sampleData.factoryData && sampleData.factoryData.profile) {
+        sampleData.factoryData.profile.name = this.newFactoryName.trim();
+        sampleData.factoryData.profile.model = this.newFactoryModel;
+        sampleData.factoryData.profile.admin_uid = null;
+      }
+
+      const factoryDataRef = dbRef(db, '/data');
+      const newCompanyRef = push(factoryDataRef);
+      const newKey = newCompanyRef.key;
+      if (!newKey) throw new Error('Failed to generate new factory ID');
+
+      await set(newCompanyRef, sampleData);
+
+      // Register in factories registry as unclaimed (admin_uid: null)
+      const factoryRecordRef = dbRef(db, getFactoriesPath(newKey));
+      await set(factoryRecordRef, {
+        key: newKey,
+        name: this.newFactoryName.trim(),
+        company: this.newFactoryCompany.trim(),
+        admin_uid: null,
+        created_by: user.uid,
+        created_at: Date.now()
+      });
+
+      this.showNewFactoryDialog = false;
+      const createdKey = newKey;
+      const createdName = this.newFactoryName.trim();
+      this.newFactoryName = '';
+
+      alert(`🎉 New Factory Created!\n\nFactory: ${createdName}\nFactory Keychain ID: ${createdKey}\n\nShare this Keychain ID with the new factory manager. When they register with this key, they will automatically become the Factory Administrator!`);
+    } catch (err: any) {
+      alert(`Error creating factory: ${err.message}`);
+    }
+  }
+
+  private async saveFactoryAndOrganizationSettings() {
     const user = this.authState.user;
     const profile = this.authState.profile;
-    if (!user || !profile) return;
+    const companyKey = profile?.key;
+    if (!user || !profile || !companyKey) return;
 
     try {
       const userProfileRef = dbRef(db, getUserProfilePath(user.uid));
       await update(userProfileRef, {
-        company: this.editCompany
+        company: this.editCompany,
+        factoryName: this.editFactoryName
       });
-      this.triggerSuccess('Organization details synced successfully.');
+
+      if (profile.role === 'admin' && this.editFactoryName) {
+        await update(dbRef(db, getCompanyPath(companyKey, DbFolder.FACTORY_PROFILE)), {
+          name: this.editFactoryName
+        });
+        await update(dbRef(db, getFactoriesPath(companyKey)), {
+          name: this.editFactoryName,
+          company: this.editCompany
+        }).catch(() => {});
+      }
+
+      this.triggerSuccess('Factory and Organization details synced successfully.');
     } catch (err: any) {
       this.triggerError(err.message);
     }
@@ -692,13 +846,9 @@ export class ViewSettings extends LitElement {
       const credential = EmailAuthProvider.credential(user.email || '', password);
       await reauthenticateWithCredential(user, credential);
 
-      // 1. Wipe the central corporate factory data workspace entirely
       await remove(dbRef(db, `/data/${companyKey}`));
-
-      // 2. Erase user's own profile and company routing references
+      await remove(dbRef(db, getFactoriesPath(companyKey))).catch(() => {});
       await remove(dbRef(db, getUserProfilePath(user.uid)));
-
-      // 3. Delete the user from authentication credentials
       await deleteUser(user);
 
       alert('All factory databases and company subscriptions have been permanently purged. Service terminated.');
@@ -713,6 +863,7 @@ export class ViewSettings extends LitElement {
     const profile = this.authState.profile;
     const appData = this.appDataController.data;
     const avatarUrl = user?.photoURL || '/images/profile/icon-512x512.png';
+    const isAdmin = profile?.role === 'admin';
 
     return html`
       <div class="settings-grid">
@@ -864,32 +1015,81 @@ export class ViewSettings extends LitElement {
           </div>
         </div>
 
-        <!-- 6. Organization Layout -->
+        <!-- 6. Factory & Organization Layout -->
         <div class="settings-card">
-          <h3 class="card-title">Organization Settings</h3>
+          <h3 class="card-title">Factory & Organization</h3>
+
+          <md-outlined-text-field 
+            label="Factory Name" 
+            .value=${this.editFactoryName}
+            ?disabled=${!isAdmin}
+            helperText=${isAdmin ? 'Name of this specific manufacturing plant' : 'Only Administrator can change factory name'}
+            @input=${(e: Event) => this.editFactoryName = (e.target as HTMLInputElement).value}>
+          </md-outlined-text-field>
+
           <md-outlined-text-field 
             label="Company Name" 
             .value=${this.editCompany}
+            ?disabled=${!isAdmin}
             @input=${(e: Event) => this.editCompany = (e.target as HTMLInputElement).value}>
           </md-outlined-text-field>
 
-          <div style="font-size:0.85rem; color:#555; line-height:1.5; background:#fafafa; border-radius:6px; border:1px solid rgba(0,0,0,0.04); padding:10px;">
-            <div><strong>Active Keychain ID:</strong> ${profile?.key || 'N/A'}</div>
-            <div><strong>User Role:</strong> ${profile?.role || 'operator'}</div>
-          </div>
+          ${isAdmin ? html`
+            <div class="keychain-box">
+              <div>
+                <strong>Factory Keychain ID:</strong>
+                <div class="keychain-key-display">${profile?.key || 'N/A'}</div>
+              </div>
+              <div style="display:flex; align-items:center; justify-content:space-between; margin-top:4px;">
+                <div>
+                  <strong>Role:</strong> 
+                  <span class="role-badge admin">
+                    ADMIN (OWNER)
+                  </span>
+                </div>
+                <md-outlined-button @click=${this.copyKeychain} style="--md-outlined-button-label-text-size: 0.8rem;">
+                  <md-icon slot="icon">content_copy</md-icon> Copy Key
+                </md-outlined-button>
+              </div>
+              <span style="font-size:0.76rem; color:#777;">Share this Keychain ID with new members. They will join this factory as Operators.</span>
+            </div>
 
-          <md-outlined-button class="btn-block" @click=${this.openKeychainEditor}>Manage Keychain</md-outlined-button>
-          <md-outlined-button class="btn-block" @click=${this.openManageUsers}>Manage Users</md-outlined-button>
-          <md-filled-button class="btn-block" @click=${this.saveOrganizationSettings}>Save Organization Settings</md-filled-button>
+            <md-filled-button class="btn-block" @click=${this.saveFactoryAndOrganizationSettings}>
+              Save Factory & Organization
+            </md-filled-button>
 
-          ${profile?.role === 'admin' ? html`
+            <div style="display:flex; gap:8px;">
+              <md-outlined-button style="flex:1;" @click=${this.openManageUsers}>Manage Users</md-outlined-button>
+              <md-outlined-button style="flex:1;" @click=${this.openKeychainEditor}>Switch Key</md-outlined-button>
+            </div>
+
+            <md-outlined-button class="btn-block" @click=${this.openProvisionNewFactory}>
+              <md-icon slot="icon">add_business</md-icon> Provision New Factory
+            </md-outlined-button>
+
             <md-outlined-button 
               class="btn-block" 
               @click=${this.terminateServiceAndWipeWorkspace} 
-              style="--md-outlined-button-label-text-color: #c62828; --md-outlined-button-outline-color: #fde8e8; margin-top: 12px;">
-              <md-icon slot="icon">delete_forever</md-icon> Terminate Service & Wipe Data
+              style="--md-outlined-button-label-text-color: #c62828; --md-outlined-button-outline-color: #fde8e8; margin-top: 4px;">
+              <md-icon slot="icon">delete_forever</md-icon> Terminate Factory & Wipe Data
             </md-outlined-button>
-          ` : ''}
+          ` : html`
+            <div class="keychain-box">
+              <div style="display:flex; align-items:center; justify-content:space-between;">
+                <div>
+                  <strong>Role:</strong> 
+                  <span class="role-badge operator">
+                    OPERATOR
+                  </span>
+                </div>
+              </div>
+              <span style="font-size:0.76rem; color:#777;">You are an active operator for this factory workspace. Settings and user administration are managed by your factory administrator.</span>
+            </div>
+
+            <md-outlined-button class="btn-block" @click=${this.openManageUsers}>
+              <md-icon slot="icon">group</md-icon> View Factory Team
+            </md-outlined-button>
+          `}
         </div>
       </div>
 
@@ -897,13 +1097,13 @@ export class ViewSettings extends LitElement {
       ${this.showKeychainDialog ? html`
         <div class="overlay">
           <div class="dialog">
-            <h4>Manage Database Keychain</h4>
+            <h4>Switch Database Keychain</h4>
             <p style="font-size:0.85rem; color:#e53935; line-height:1.4; margin:0;">
               ⚠️ WARNING: Modifying your data keychain will point your user session to a different factory silo. Ensure you have backed up your current data.
             </p>
 
             <md-outlined-text-field 
-              label="Data Keychain ID Key" 
+              label="Target Factory Keychain ID" 
               .value=${this.newKeychainKey}
               @input=${(e: Event) => this.newKeychainKey = (e.target as HTMLInputElement).value}
               required>
@@ -917,53 +1117,104 @@ export class ViewSettings extends LitElement {
         </div>
       ` : ''}
 
+      <!-- Provision New Factory Overlay -->
+      ${this.showNewFactoryDialog ? html`
+        <div class="overlay">
+          <div class="dialog">
+            <h4>Provision New Factory Workspace</h4>
+            <p style="font-size:0.85rem; color:#555; line-height:1.4; margin:0;">
+              Create a new isolated factory workspace. The first user to register with the generated Keychain ID will automatically become the Factory Administrator.
+            </p>
+
+            <md-outlined-text-field 
+              label="Company Name" 
+              .value=${this.newFactoryCompany}
+              @input=${(e: Event) => this.newFactoryCompany = (e.target as HTMLInputElement).value}
+              required>
+            </md-outlined-text-field>
+
+            <md-outlined-text-field 
+              label="Factory Name" 
+              .value=${this.newFactoryName}
+              @input=${(e: Event) => this.newFactoryName = (e.target as HTMLInputElement).value}
+              required>
+            </md-outlined-text-field>
+
+            <md-outlined-select 
+              label="Production Line Model" 
+              .value=${this.newFactoryModel} 
+              @change=${(e: Event) => this.newFactoryModel = (e.target as HTMLSelectElement).value}>
+              <md-select-option value="serial"><div slot="headline">Serial Production</div></md-select-option>
+              <md-select-option value="parallel"><div slot="headline">Parallel Line Production</div></md-select-option>
+              <md-select-option value="multi"><div slot="headline">Multi-Part Assembly Line</div></md-select-option>
+            </md-outlined-select>
+
+            <div class="dialog-actions">
+              <md-outlined-button @click=${() => this.showNewFactoryDialog = false}>Cancel</md-outlined-button>
+              <md-filled-button @click=${this.submitNewFactory}>Create Factory</md-filled-button>
+            </div>
+          </div>
+        </div>
+      ` : ''}
+
       <!-- Manage Users Dialog Overlay -->
       ${this.showManageUsersDialog ? html`
         <div class="overlay">
-          <div class="dialog" style="max-width:540px;">
-            <h4>Manage Company Members</h4>
-            <p style="font-size:0.85rem; color:#666; margin:0;">Below are the active registered accounts linked to your factory database keychain:</p>
+          <div class="dialog" style="max-width:560px;">
+            <h4>${isAdmin ? 'Manage Factory Members' : 'Factory Team Members'}</h4>
+            <p style="font-size:0.85rem; color:#666; margin:0;">
+              ${isAdmin 
+                ? 'Members associated with this factory. Strictly one Administrator per factory.' 
+                : 'Current active team members associated with this factory workspace.'}
+            </p>
 
             <div class="users-list">
               ${(this.companyUsersState.data || []).length === 0 ? html`
-                <span style="font-style:italic; color:#888; text-align:center; padding:12px;">No unlinked members found. All users registered under this key automatically sync here.</span>
-              ` : (this.companyUsersState.data || []).map((u: CompanyUserData) => html`
-                <div class="user-list-item">
-                  <div class="user-item-details">
-                    <img 
-                      class="user-item-avatar" 
-                      src="${u.photoURL || '/images/profile/icon-512x512.png'}" 
-                      @error=${(e: Event) => {
-                        const target = e.target as HTMLImageElement;
-                        if (target.src.includes('icon-512x512.png')) {
-                          target.src = '/images/profile/any.svg';
-                        }
-                      }} />
-                    <div class="user-item-info">
-                      <span class="user-item-name">${u.displayname} ${u.uid === user?.uid ? '(You)' : ''}</span>
-                      <span class="user-item-email">${u.email}</span>
+                <span style="font-style:italic; color:#888; text-align:center; padding:12px;">
+                  ${isAdmin ? 'No members found. Share your Keychain ID for operators to join.' : 'No other members found.'}
+                </span>
+              ` : (this.companyUsersState.data || []).map((u: CompanyUserData) => {
+                const isMemberAdmin = u.role === 'admin';
+                return html`
+                  <div class="user-list-item">
+                    <div class="user-item-details">
+                      <img 
+                        class="user-item-avatar" 
+                        src="${u.photoURL || '/images/profile/icon-512x512.png'}" 
+                        @error=${(e: Event) => {
+                          const target = e.target as HTMLImageElement;
+                          if (target.src.includes('icon-512x512.png')) {
+                            target.src = '/images/profile/any.svg';
+                          }
+                        }} />
+                      <div class="user-item-info">
+                        <span class="user-item-name">${u.displayname || 'User'} ${u.uid === user?.uid ? '(You)' : ''}</span>
+                        <span class="user-item-email">${u.email}</span>
+                      </div>
+                    </div>
+
+                    <div class="user-item-actions">
+                      <span class="role-badge ${isMemberAdmin ? 'admin' : 'operator'}">
+                        ${isMemberAdmin ? 'ADMIN (OWNER)' : 'OPERATOR'}
+                      </span>
+
+                      ${isAdmin && !isMemberAdmin ? html`
+                        <md-outlined-button 
+                          style="--md-outlined-button-label-text-size: 0.72rem; padding: 0 8px;"
+                          @click=${() => this.transferAdminOwnership(u.uid, u.displayname || u.email)}
+                          title="Transfer Factory Administrator ownership to this user">
+                          Transfer Admin
+                        </md-outlined-button>
+                        <md-icon-button 
+                          @click=${() => this.removeUserFromCompany(u.uid)} 
+                          title="Remove Operator from Factory">
+                          <md-icon style="color:#d32f2f;">person_remove</md-icon>
+                        </md-icon-button>
+                      ` : ''}
                     </div>
                   </div>
-
-                  <div class="user-item-actions">
-                    <md-outlined-select 
-                      style="min-width:110px; --md-outlined-select-text-field-container-height: 32px;"
-                      .value=${u.role}
-                      ?disabled=${u.uid === user?.uid}
-                      @change=${(e: Event) => this.changeUserRole(u.uid, (e.target as HTMLSelectElement).value)}>
-                      <md-select-option value="operator"><div slot="headline">Operator</div></md-select-option>
-                      <md-select-option value="admin"><div slot="headline">Admin</div></md-select-option>
-                    </md-outlined-select>
-
-                    <md-icon-button 
-                      ?disabled=${u.uid === user?.uid}
-                      @click=${() => this.removeUserFromCompany(u.uid)} 
-                      title="Remove Member">
-                      <md-icon style="color:#d32f2f;">person_remove</md-icon>
-                    </md-icon-button>
-                  </div>
-                </div>
-              `)}
+                `;
+              })}
             </div>
 
             <div class="dialog-actions">

@@ -3,12 +3,12 @@ import { customElement, state, query } from 'lit/decorators.js';
 import { ContextProvider } from '@lit/context';
 import { Router } from '@vaadin/router';
 import { onAuthStateChanged, signOut } from 'firebase/auth';
-import { ref, onValue, update } from 'firebase/database';
+import { ref, onValue, update, get, set } from 'firebase/database';
 import { auth, db } from './config/firebase.js';
 import { userContext, UserContextValue, UserProfile } from './context/userContext.js';
 import { FirebaseQueryController } from './controllers/FirebaseQueryController.js';
 import { FirebaseDocController } from './controllers/FirebaseDocController.js';
-import { DbFolder, getCompanyPath, getUserProfilePath } from './config/db-paths.js';
+import { DbFolder, getCompanyPath, getUserProfilePath, getFactoriesPath, getSystemPath } from './config/db-paths.js';
 
 // Top-level route view imports for instant, delay-free navigation
 import './view-login.js';
@@ -289,6 +289,65 @@ export class ViewApp extends LitElement {
       align-items: center;
       gap: 12px;
     }
+    .page-header-right {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+    }
+    .factory-header-chip {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      padding: 6px 14px;
+      background: #f7f9fa;
+      border: 1px solid rgba(0, 0, 0, 0.08);
+      border-radius: 20px;
+      font-size: 0.84rem;
+      font-weight: 500;
+      color: #202020;
+    }
+    .factory-header-chip md-icon {
+      font-size: 18px;
+      --md-icon-size: 18px;
+      color: #555;
+    }
+    .factory-header-name {
+      max-width: 220px;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+    .role-badge {
+      font-size: 0.68rem;
+      font-weight: 600;
+      letter-spacing: 0.5px;
+      padding: 2px 7px;
+      border-radius: 10px;
+      text-transform: uppercase;
+    }
+    .role-badge.admin {
+      background: #e8f5e9;
+      color: #2e7d32;
+      border: 1px solid #c8e6c9;
+    }
+    .role-badge.operator {
+      background: #e3f2fd;
+      color: #1565c0;
+      border: 1px solid #bbdefb;
+    }
+    .user-factory-tag {
+      font-size: 0.72rem;
+      color: #666;
+      margin: 4px 0 0 0;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 4px;
+      max-width: 190px;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
     .page-title {
       font-size: 1.25rem;
       font-weight: 500;
@@ -542,6 +601,33 @@ export class ViewApp extends LitElement {
                 role: profile.role || 'operator',
                 photoURL: profile.photoURL || null
               }).catch((e) => console.warn('User directory sync bypassed:', e.message));
+
+              // Register/sync factory entry in the central registry if missing
+              const factoryRef = ref(db, getFactoriesPath(profile.key));
+              get(factoryRef).then((facSnap) => {
+                if (!facSnap.exists()) {
+                  set(factoryRef, {
+                    key: profile.key,
+                    company: profile.company || 'Company',
+                    name: profile.company || 'Factory',
+                    admin_uid: profile.role === 'admin' ? user.uid : null,
+                    created_at: Date.now()
+                  }).catch(() => {});
+                } else {
+                  const facData = facSnap.val();
+                  if (!facData.admin_uid && profile.role === 'admin') {
+                    update(factoryRef, { admin_uid: user.uid }).catch(() => {});
+                  }
+                }
+              }).catch(() => {});
+
+              // Ensure system super-admin reference is recorded
+              const sysRef = ref(db, getSystemPath());
+              get(sysRef).then((sysSnap) => {
+                if (!sysSnap.exists() && profile.role === 'admin') {
+                  set(sysRef, { super_admin_uid: user.uid, created_at: Date.now() }).catch(() => {});
+                }
+              }).catch(() => {});
             }
 
             this.updateAuthState({
@@ -700,6 +786,8 @@ export class ViewApp extends LitElement {
     const showLayout = this.authState.user !== null && this.activeRoute !== 'login';
     const profile = this.authState.profile;
     const avatarUrl = profile?.photoURL || '/images/profile/icon-512x512.png';
+    const factoryName = this.factoryProfileController.data?.name || profile?.company || 'Factory';
+    const companyName = profile?.company || 'IMES MES';
 
     return html`
       <!-- Fixed Loading Screen Overlay -->
@@ -721,7 +809,7 @@ export class ViewApp extends LitElement {
             </button>
             <div class="drawer-brand-container">
               <h1 class="drawer-title">IMES</h1>
-              <p class="drawer-subtitle">Win The Day</p>
+              <p class="drawer-subtitle">Win the day</p>
             </div>
           </div>
 
@@ -763,7 +851,15 @@ export class ViewApp extends LitElement {
                 }} />
               <div class="user-details">
                 <p class="user-name">${profile?.displayname || 'User Profile'}</p>
-                <p class="user-role">${profile?.role ? profile.role.toUpperCase() : 'OPERATOR'}</p>
+                <div style="display:flex; align-items:center; gap:6px; margin:2px 0;">
+                  <span class="role-badge ${profile?.role === 'admin' ? 'admin' : 'operator'}">
+                    ${profile?.role ? profile.role.toUpperCase() : 'OPERATOR'}
+                  </span>
+                </div>
+                <span class="user-factory-tag" title="Factory: ${factoryName}">
+                  <md-icon style="font-size:14px; --md-icon-size:14px;">factory</md-icon>
+                  ${factoryName}
+                </span>
               </div>
             </div>
           </div>
@@ -776,6 +872,15 @@ export class ViewApp extends LitElement {
                 <md-icon>menu</md-icon>
               </md-icon-button>
               <h2 class="page-title">${this.headerTitle}</h2>
+            </div>
+            <div class="page-header-right">
+              <div class="factory-header-chip" title="Active Factory: ${factoryName} (${companyName})">
+                <md-icon>factory</md-icon>
+                <span class="factory-header-name">${factoryName}</span>
+                <span class="role-badge ${profile?.role === 'admin' ? 'admin' : 'operator'}">
+                  ${profile?.role ? profile.role.toUpperCase() : 'OPERATOR'}
+                </span>
+              </div>
             </div>
           </header>
 
