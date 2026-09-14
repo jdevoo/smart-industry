@@ -32,6 +32,7 @@ import {
   PerformanceData
 } from '../context/dataContexts.js';
 import { DbFolder, getCompanyPath } from '../config/db-paths.js';
+import { ProductPartStep, StationMachineInfo } from '../utils/scheduling.js';
 
 // Material Design 3 & Vaadin Imports
 import '@material/web/button/filled-button.js';
@@ -55,15 +56,6 @@ interface ScheduleItem {
   order_color: string;
 }
 
-interface ProductPartStep {
-  name: string;
-  sku: string;
-  process?: number[];
-  setup?: number[];
-  cycle?: number[];
-  dependency?: string;
-}
-
 interface OrderItem {
   $key: string;
   order_no: number;
@@ -78,12 +70,6 @@ interface OrderItem {
   order_status: 'waiting' | 'wip' | 'done' | 'late' | 'cancel';
   order_color: string;
   order_date: number;
-}
-
-interface StationMachineInfo {
-  mid: string;
-  name: string;
-  number: number;
 }
 
 interface StationItem {

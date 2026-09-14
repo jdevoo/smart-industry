@@ -14,6 +14,6 @@ const firebaseConfig = {
 };
 
 // Initialize Firebase
-export const app = initializeApp(firebaseConfig, 'smart-mes');
+const app = initializeApp(firebaseConfig, 'smart-mes');
 export const auth = getAuth(app);
 export const db = getDatabase(app);
