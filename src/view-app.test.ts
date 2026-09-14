@@ -30,4 +30,36 @@ describe('view-app Custom Element Test Suite', () => {
     // Cleanup DOM
     document.body.removeChild(el);
   });
+
+  it('should display suspended notice when profile status is inactive', async () => {
+    const el = document.createElement('view-app') as any;
+    document.body.appendChild(el);
+    await el.updateComplete;
+
+    el.updateAuthState({
+      user: { uid: 'op-deactivated', email: 'deactivated@factory.com' },
+      profile: {
+        company: 'Roong',
+        created: 123456,
+        displayname: 'Former Operator',
+        email: 'deactivated@factory.com',
+        key: '-Key123',
+        photoURL: null,
+        phone: '+12345678',
+        role: 'operator',
+        setup: true,
+        status: 'inactive'
+      },
+      loading: false
+    });
+    await el.updateComplete;
+
+    const suspendedTitle = el.shadowRoot?.querySelector('h2');
+    expect(suspendedTitle?.textContent).toBe('Account Suspended');
+
+    const appContainer = el.shadowRoot?.querySelector('.app-container');
+    expect(appContainer?.hasAttribute('hidden')).toBe(true);
+
+    document.body.removeChild(el);
+  });
 });

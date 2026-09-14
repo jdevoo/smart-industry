@@ -13,6 +13,8 @@ export interface UserProfile {
   setup: boolean;
   factoryName?: string;
   isSuperAdmin?: boolean;
+  status?: 'active' | 'inactive';
+  deactivated_at?: number;
 }
 
 export interface UserContextValue {

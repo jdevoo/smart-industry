@@ -58,6 +58,8 @@ export interface CompanyUserData {
   displayname?: string;
   role: string;
   photoURL?: string;
+  status?: 'active' | 'inactive';
+  deactivated_at?: number;
 }
 
 // Global real-time query contexts

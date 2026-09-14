@@ -673,6 +673,9 @@ export class ViewApp extends LitElement {
     const path = window.location.pathname;
     
     if (authenticated) {
+      if (this.authState.profile?.status === 'inactive') {
+        return;
+      }
       if (path === '/login' || path === '/') {
         Router.go('/app/dashboard');
       }
@@ -785,6 +788,7 @@ export class ViewApp extends LitElement {
   override render() {
     const showLayout = this.authState.user !== null && this.activeRoute !== 'login';
     const profile = this.authState.profile;
+    const isInactive = profile?.status === 'inactive';
     const avatarUrl = profile?.photoURL || '/images/profile/icon-512x512.png';
     const factoryName = this.factoryProfileController.data?.name || profile?.company || 'Factory';
     const companyName = profile?.company || 'IMES MES';
@@ -798,7 +802,20 @@ export class ViewApp extends LitElement {
         </div>
       ` : ''}
 
-      <div class="app-container" ?hidden=${this.authState.loading}>
+      ${isInactive ? html`
+        <div class="loading-screen" style="background:#ffffff; color:#202020;">
+          <div style="max-width:480px; text-align:center; padding:32px; border-radius:12px; border:1px solid #e0e0e0; box-shadow:0 4px 16px rgba(0,0,0,0.08);">
+            <md-icon style="font-size:56px; --md-icon-size:56px; color:#e53935; margin-bottom:16px;">block</md-icon>
+            <h2 style="font-size:1.5rem; margin:0 0 12px 0; color:#202020;">Account Suspended</h2>
+            <p style="color:#666; font-size:0.95rem; line-height:1.5; margin:0 0 24px 0;">
+              Your account has been deactivated by the Factory Administrator. You currently do not have access to the MES shop-floor system.
+            </p>
+            <button class="logout-btn" @click=${this.logout} style="max-width:200px; margin:0 auto;">Sign Out</button>
+          </div>
+        </div>
+      ` : ''}
+
+      <div class="app-container" ?hidden=${this.authState.loading || isInactive}>
         <!-- Overlay backdrop for mobile -->
         <div class="backdrop ${this.drawerOpen ? 'open' : ''}" @click=${() => this.drawerOpen = false}></div>
 

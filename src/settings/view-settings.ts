@@ -191,6 +191,11 @@ export class ViewSettings extends LitElement {
       color: #1565c0;
       border: 1px solid #bbdefb;
     }
+    .role-badge.inactive {
+      background: #f5f5f5;
+      color: #888888;
+      border: 1px solid #e0e0e0;
+    }
 
     /* Manage Users List */
     .users-list {
@@ -446,34 +451,6 @@ export class ViewSettings extends LitElement {
     }
   }
 
-  private async deleteAccount() {
-    const user = this.authState.user;
-    const companyKey = this.authState.profile?.key;
-    if (!user || !companyKey) return;
-
-    if (confirm('Are you sure you want to delete your personal profile and account credentials? This will not affect the shared company factory data if other members exist.')) {
-      const password = prompt("To confirm profile deletion, please enter your current password:");
-      if (!password) {
-        alert('Password verification canceled. Profile deletion aborted.');
-        return;
-      }
-
-      try {
-        const credential = EmailAuthProvider.credential(user.email || '', password);
-        await reauthenticateWithCredential(user, credential);
-
-        await remove(dbRef(db, getCompanyPath(companyKey, DbFolder.USERS, user.uid)));
-        await remove(dbRef(db, getUserProfilePath(user.uid)));
-        await deleteUser(user);
-
-        alert('Your personal profile account was successfully deleted.');
-        window.location.reload();
-      } catch (err: any) {
-        alert(`Profile deletion failed: ${err.message}`);
-      }
-    }
-  }
-
   private async saveAccountSettings() {
     const user = this.authState.user;
     if (!user) return;
@@ -684,17 +661,34 @@ export class ViewSettings extends LitElement {
     }
   }
 
-  private async removeUserFromCompany(uid: string) {
+  private async toggleUserActiveStatus(uid: string, currentStatus: string | undefined, displayName: string) {
     const companyKey = this.authState.profile?.key;
     if (!companyKey) return;
 
-    if (confirm('Are you sure you want to remove this user from this factory? They will lose access to all factory data.')) {
-      try {
-        await remove(dbRef(db, getCompanyPath(companyKey, DbFolder.USERS, uid)));
-        this.triggerSuccess('User successfully unlinked from factory silo.');
-      } catch (err: any) {
-        this.triggerError(err.message);
+    const isDeactivating = currentStatus !== 'inactive';
+    const actionWord = isDeactivating ? 'deactivate' : 'reactivate';
+
+    if (!confirm(`Are you sure you want to ${actionWord} ${displayName}?\n\n${isDeactivating ? '• The operator will immediately be blocked from accessing this factory workspace.\n• Historical jobs, logs, and production records will remain intact.' : '• The operator will regain access to this factory workspace.'}`)) {
+      return;
+    }
+
+    try {
+      const newStatus = isDeactivating ? 'inactive' : 'active';
+      const updates: any = { status: newStatus };
+      if (isDeactivating) {
+        updates.deactivated_at = Math.round(Date.now() / 1000);
+      } else {
+        updates.deactivated_at = null;
       }
+
+      // Update in company users directory
+      await update(dbRef(db, getCompanyPath(companyKey, DbFolder.USERS, uid)), updates);
+      // Update in user personal profile as well
+      await update(dbRef(db, getUserProfilePath(uid)), updates).catch(() => {});
+
+      this.triggerSuccess(`Operator successfully ${isDeactivating ? 'deactivated' : 'reactivated'}.`);
+    } catch (err: any) {
+      this.triggerError(`Failed to update operator status: ${err.message}`);
     }
   }
 
@@ -914,16 +908,6 @@ export class ViewSettings extends LitElement {
           </md-outlined-text-field>
 
           <md-filled-button class="btn-block" @click=${this.saveAccountSettings}>Save Account Details</md-filled-button>
-          
-          <md-outlined-button 
-            class="btn-block" 
-            @click=${this.deleteAccount} 
-            ?disabled=${(this.companyUsersState.data || []).length <= 1}
-            style="--md-outlined-button-label-text-color: #c62828; --md-outlined-button-outline-color: #fde8e8;"
-            title="Delete your personal profile credentials">
-            <md-icon slot="icon">no_accounts</md-icon> 
-            Delete User Profile
-          </md-outlined-button>
         </div>
 
         <!-- 3. Authentication Settings -->
@@ -1185,22 +1169,26 @@ export class ViewSettings extends LitElement {
                     </div>
 
                     <div class="user-item-actions">
-                      <span class="role-badge ${isMemberAdmin ? 'admin' : 'operator'}">
-                        ${isMemberAdmin ? 'ADMIN (OWNER)' : 'OPERATOR'}
+                      <span class="role-badge ${isMemberAdmin ? 'admin' : (u.status === 'inactive' ? 'inactive' : 'operator')}">
+                        ${isMemberAdmin ? 'ADMIN (OWNER)' : (u.status === 'inactive' ? 'INACTIVE' : 'OPERATOR')}
                       </span>
 
                       ${isAdmin && !isMemberAdmin ? html`
+                        ${u.status !== 'inactive' ? html`
+                          <md-outlined-button 
+                            style="--md-outlined-button-label-text-size: 0.72rem; padding: 0 8px;"
+                            @click=${() => this.transferAdminOwnership(u.uid, u.displayname || u.email)}
+                            title="Transfer Factory Administrator ownership to this user">
+                            Transfer Admin
+                          </md-outlined-button>
+                        ` : ''}
                         <md-outlined-button 
-                          style="--md-outlined-button-label-text-size: 0.72rem; padding: 0 8px;"
-                          @click=${() => this.transferAdminOwnership(u.uid, u.displayname || u.email)}
-                          title="Transfer Factory Administrator ownership to this user">
-                          Transfer Admin
+                          style="--md-outlined-button-label-text-size: 0.72rem; padding: 0 8px; ${u.status === 'inactive' ? '--md-outlined-button-label-text-color: #2e7d32; --md-outlined-button-outline-color: #c3e6cb;' : '--md-outlined-button-label-text-color: #c62828; --md-outlined-button-outline-color: #fde8e8;'}"
+                          @click=${() => this.toggleUserActiveStatus(u.uid, u.status, u.displayname || u.email)} 
+                          title="${u.status === 'inactive' ? 'Reactivate Operator' : 'Deactivate Operator (Logical Delete)'}">
+                          <md-icon slot="icon">${u.status === 'inactive' ? 'check_circle' : 'block'}</md-icon>
+                          ${u.status === 'inactive' ? 'Reactivate' : 'Deactivate'}
                         </md-outlined-button>
-                        <md-icon-button 
-                          @click=${() => this.removeUserFromCompany(u.uid)} 
-                          title="Remove Operator from Factory">
-                          <md-icon style="color:#d32f2f;">person_remove</md-icon>
-                        </md-icon-button>
                       ` : ''}
                     </div>
                   </div>
