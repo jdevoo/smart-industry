@@ -15,7 +15,7 @@ import {
   PerformanceData,
   ScheduleConfigData
 } from '../context/dataContexts.js';
-import { DbFolder, getCompanyPath, getUserProfilePath } from '../config/db-paths.js';
+import { DbFolder, getCompanyPath, getUserProfilePath, getFactoriesPath } from '../config/db-paths.js';
 
 // Material Design 3 UI Imports
 import '@material/web/textfield/outlined-text-field.js';
@@ -23,6 +23,7 @@ import '@material/web/button/filled-button.js';
 import '@material/web/select/outlined-select.js';
 import '@material/web/select/select-option.js';
 import '@material/web/checkbox/checkbox.js';
+import '@material/web/icon/icon.js';
 
 @customElement('view-setup-factory')
 export class ViewSetupFactory extends LitElement {
@@ -92,6 +93,18 @@ export class ViewSetupFactory extends LitElement {
       background-color: #eafaf1;
       color: #2e7d32;
       border: 1px solid #c3e6cb;
+    }
+    .operator-banner {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      padding: 12px 16px;
+      background: #f0f4f8;
+      border: 1px solid #d0dbe5;
+      border-radius: 8px;
+      margin-bottom: 20px;
+      color: #2c3e50;
+      font-size: 0.92rem;
     }
   `;
 
@@ -194,6 +207,11 @@ export class ViewSetupFactory extends LitElement {
   }
 
   private async saveSettings() {
+    if (this.authState.profile?.role !== 'admin') {
+      alert('Unauthorized: Only Administrators can modify Factory Topology.');
+      return;
+    }
+
     this.saveSuccess = false;
     const companyKey = this.authState.profile?.key;
     const uid = this.authState.user?.uid;
@@ -239,7 +257,15 @@ export class ViewSetupFactory extends LitElement {
       });
 
       // 5. Explicitly flag setup complete inside profile node
-      await update(dbRef(db, getUserProfilePath(uid)), { setup: true });
+      await update(dbRef(db, getUserProfilePath(uid)), { 
+        setup: true,
+        factoryName: this.factoryName || 'Untitled Factory'
+      });
+
+      // 6. Sync factory name to central factory registry
+      await update(dbRef(db, getFactoriesPath(companyKey)), {
+        name: this.factoryName || 'Untitled Factory'
+      }).catch(() => {});
 
       this.saveSuccess = true;
       setTimeout(() => this.saveSuccess = false, 4000);
@@ -259,7 +285,18 @@ export class ViewSetupFactory extends LitElement {
       return html`<p>Retrieving Factory Topology configurations...</p>`;
     }
 
+    const isAdmin = this.authState.profile?.role === 'admin';
+
     return html`
+      ${!isAdmin ? html`
+        <div class="operator-banner">
+          <md-icon style="font-size:22px; --md-icon-size:22px; color:#4a6572;">visibility</md-icon>
+          <div>
+            <strong>Operator View Mode:</strong> You are viewing the factory topology in read-only mode. Only an Administrator can adjust production flow, shift times, and planning parameters.
+          </div>
+        </div>
+      ` : ''}
+
       <div class="form-layout">
         <!-- Section 1: Factory Identity & Model -->
         <div class="card-section">
@@ -268,6 +305,8 @@ export class ViewSetupFactory extends LitElement {
           <md-outlined-text-field 
             label="Factory Name" 
             .value=${this.factoryName}
+            ?disabled=${!isAdmin}
+            helperText=${isAdmin ? 'Name of this manufacturing facility' : 'Read-only: Managed by Factory Administrator'}
             @input=${(e: Event) => this.factoryName = (e.target as HTMLInputElement).value}
             required>
           </md-outlined-text-field>
@@ -275,6 +314,7 @@ export class ViewSetupFactory extends LitElement {
           <md-outlined-select 
             label="Manufacturing Layout Type" 
             .value=${this.factoryType} 
+            ?disabled=${!isAdmin}
             @change=${(e: Event) => this.factoryType = (e.target as HTMLSelectElement).value}>
             <md-select-option value="jobshop">
               <div slot="headline">Job Shop Manufacturer</div>
@@ -284,6 +324,7 @@ export class ViewSetupFactory extends LitElement {
           <md-outlined-select 
             label="Production Line Flow Model" 
             .value=${this.model} 
+            ?disabled=${!isAdmin}
             @change=${(e: Event) => this.model = (e.target as HTMLSelectElement).value}>
             <md-select-option value="serial">
               <div slot="headline">Serial (Single Path)</div>
@@ -303,6 +344,7 @@ export class ViewSetupFactory extends LitElement {
               min="2"
               max="10"
               .value=${this.concurrency.toString()}
+              ?disabled=${!isAdmin}
               @input=${(e: Event) => this.concurrency = Number((e.target as HTMLInputElement).value)}>
             </md-outlined-text-field>
           ` : ''}
@@ -317,6 +359,7 @@ export class ViewSetupFactory extends LitElement {
               label="Shift Start" 
               type="time" 
               .value=${this.op_start}
+              ?disabled=${!isAdmin}
               @change=${(e: Event) => this.op_start = (e.target as HTMLInputElement).value}>
             </md-outlined-text-field>
 
@@ -324,6 +367,7 @@ export class ViewSetupFactory extends LitElement {
               label="Shift End" 
               type="time" 
               .value=${this.op_end}
+              ?disabled=${!isAdmin}
               @change=${(e: Event) => this.op_end = (e.target as HTMLInputElement).value}>
             </md-outlined-text-field>
           </div>
@@ -333,6 +377,7 @@ export class ViewSetupFactory extends LitElement {
               label="Overtime Start" 
               type="time" 
               .value=${this.ot_start}
+              ?disabled=${!isAdmin}
               @change=${(e: Event) => this.ot_start = (e.target as HTMLInputElement).value}>
             </md-outlined-text-field>
 
@@ -340,6 +385,7 @@ export class ViewSetupFactory extends LitElement {
               label="Overtime End" 
               type="time" 
               .value=${this.ot_end}
+              ?disabled=${!isAdmin}
               @change=${(e: Event) => this.ot_end = (e.target as HTMLInputElement).value}>
             </md-outlined-text-field>
           </div>
@@ -352,6 +398,7 @@ export class ViewSetupFactory extends LitElement {
                   <md-checkbox 
                     id="chk-${day}"
                     ?checked=${this.opDays[day]}
+                    ?disabled=${!isAdmin}
                     @change=${(e: Event) => this.handleDayChange(day, (e.target as HTMLInputElement).checked)}>
                   </md-checkbox>
                   <label for="chk-${day}" style="text-transform: capitalize;">${day}</label>
@@ -368,6 +415,7 @@ export class ViewSetupFactory extends LitElement {
           <md-outlined-select 
             label="Productivity Optimization Strategy" 
             .value=${this.optimize} 
+            ?disabled=${!isAdmin}
             @change=${(e: Event) => this.optimize = (e.target as HTMLSelectElement).value}>
             <md-select-option value="disabled">
               <div slot="headline">No Optimization (Heuristics Only)</div>
@@ -388,6 +436,7 @@ export class ViewSetupFactory extends LitElement {
               min="30"
               max="100"
               .value=${this.au.toString()}
+              ?disabled=${!isAdmin}
               @input=${(e: Event) => this.au = Number((e.target as HTMLInputElement).value)}>
             </md-outlined-text-field>
 
@@ -398,6 +447,7 @@ export class ViewSetupFactory extends LitElement {
               min="30"
               max="100"
               .value=${this.meff.toString()}
+              ?disabled=${!isAdmin}
               @input=${(e: Event) => this.meff = Number((e.target as HTMLInputElement).value)}>
             </md-outlined-text-field>
           </div>
@@ -410,6 +460,7 @@ export class ViewSetupFactory extends LitElement {
             max="1.00"
             helperText="Ratio of acceptable scrap allocation (e.g. 0.02 = 2% scrap)"
             .value=${this.aw.toString()}
+            ?disabled=${!isAdmin}
             @input=${(e: Event) => this.aw = Number((e.target as HTMLInputElement).value)}>
           </md-outlined-text-field>
         </div>
@@ -421,6 +472,7 @@ export class ViewSetupFactory extends LitElement {
           <md-outlined-select 
             label="Default Rescheduling Cycle" 
             .value=${this.interval.toString()} 
+            ?disabled=${!isAdmin}
             @change=${(e: Event) => this.interval = Number((e.target as HTMLSelectElement).value)}>
             ${[1, 2, 3, 4, 5, 6, 7].map(i => html`
               <md-select-option value=${i.toString()}>
@@ -436,13 +488,21 @@ export class ViewSetupFactory extends LitElement {
             max="180"
             helperText="Travel and setup safety delay allowed between workstation shifts"
             .value=${this.delay.toString()}
+            ?disabled=${!isAdmin}
             @input=${(e: Event) => this.delay = Number((e.target as HTMLInputElement).value)}>
           </md-outlined-text-field>
         </div>
       </div>
 
       <div class="submit-bar">
-        <md-filled-button @click=${this.saveSettings}>Save Settings</md-filled-button>
+        ${isAdmin ? html`
+          <md-filled-button @click=${this.saveSettings}>Save Settings</md-filled-button>
+        ` : html`
+          <div style="display:flex; align-items:center; gap:8px; color:#666; font-size:0.92rem;">
+            <md-icon style="font-size:20px; --md-icon-size:20px; color:#888;">lock</md-icon>
+            <span>Factory Topology settings are read-only for Operators. Only an Administrator can modify these settings.</span>
+          </div>
+        `}
       </div>
 
       ${this.saveSuccess ? html`

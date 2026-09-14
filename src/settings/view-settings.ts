@@ -292,7 +292,6 @@ export class ViewSettings extends LitElement {
   @state() private editCurrentPassword = '';
   @state() private editNewPassword = '';
   @state() private editCompany = '';
-  @state() private editFactoryName = '';
 
   // Provision New Factory Fields
   @state() private newFactoryName = '';
@@ -307,7 +306,6 @@ export class ViewSettings extends LitElement {
   override updated() {
     const user = this.authState.user;
     const profile = this.authState.profile;
-    const factoryProfile = this.factoryProfileState?.data;
 
     if (user && !this.editEmail) {
       this.editDisplayName = user.displayName || '';
@@ -315,9 +313,6 @@ export class ViewSettings extends LitElement {
     }
     if (profile && !this.editCompany) {
       this.editCompany = profile.company || '';
-    }
-    if ((factoryProfile?.name || profile?.factoryName) && !this.editFactoryName) {
-      this.editFactoryName = factoryProfile?.name || profile?.factoryName || '';
     }
   }
 
@@ -786,7 +781,7 @@ export class ViewSettings extends LitElement {
     }
   }
 
-  private async saveFactoryAndOrganizationSettings() {
+  private async saveOrganizationSettings() {
     const user = this.authState.user;
     const profile = this.authState.profile;
     const companyKey = profile?.key;
@@ -795,21 +790,16 @@ export class ViewSettings extends LitElement {
     try {
       const userProfileRef = dbRef(db, getUserProfilePath(user.uid));
       await update(userProfileRef, {
-        company: this.editCompany,
-        factoryName: this.editFactoryName
+        company: this.editCompany
       });
 
-      if (profile.role === 'admin' && this.editFactoryName) {
-        await update(dbRef(db, getCompanyPath(companyKey, DbFolder.FACTORY_PROFILE)), {
-          name: this.editFactoryName
-        });
+      if (profile.role === 'admin') {
         await update(dbRef(db, getFactoriesPath(companyKey)), {
-          name: this.editFactoryName,
           company: this.editCompany
         }).catch(() => {});
       }
 
-      this.triggerSuccess('Factory and Organization details synced successfully.');
+      this.triggerSuccess('Organization details synced successfully.');
     } catch (err: any) {
       this.triggerError(err.message);
     }
@@ -973,20 +963,22 @@ export class ViewSettings extends LitElement {
         </div>
 
         <!-- 4. Backup Console -->
-        <div class="settings-card">
-          <h3 class="card-title">Backup & Restore</h3>
-          <p style="font-size:0.9rem; color:#555; margin:0; line-height:1.4;">Safeguard your manufacturing data by exporting/importing active JSON schemas.</p>
-          
-          <md-outlined-button class="btn-block" @click=${this.exportFactoryBackup}>Export Data Backup</md-outlined-button>
-          
-          <md-outlined-button class="btn-block" @click=${this.triggerImportFileClick}>Import Data Recovery</md-outlined-button>
-          <input 
-            type="file" 
-            id="importFileInput" 
-            accept=".json" 
-            style="display:none;" 
-            @change=${this.handleImportBackup}/>
-        </div>
+        ${isAdmin ? html`
+          <div class="settings-card">
+            <h3 class="card-title">Backup & Restore</h3>
+            <p style="font-size:0.9rem; color:#555; margin:0; line-height:1.4;">Safeguard your manufacturing data by exporting/importing active JSON schemas.</p>
+            
+            <md-outlined-button class="btn-block" @click=${this.exportFactoryBackup}>Export Data Backup</md-outlined-button>
+            
+            <md-outlined-button class="btn-block" @click=${this.triggerImportFileClick}>Import Data Recovery</md-outlined-button>
+            <input 
+              type="file" 
+              id="importFileInput" 
+              accept=".json" 
+              style="display:none;" 
+              @change=${this.handleImportBackup}/>
+          </div>
+        ` : ''}
 
         <!-- 5. Notification Routing -->
         <div class="settings-card">
@@ -1015,27 +1007,23 @@ export class ViewSettings extends LitElement {
           </div>
         </div>
 
-        <!-- 6. Factory & Organization Layout -->
+        <!-- 6. Organization Layout -->
         <div class="settings-card">
-          <h3 class="card-title">Factory & Organization</h3>
-
-          <md-outlined-text-field 
-            label="Factory Name" 
-            .value=${this.editFactoryName}
-            ?disabled=${!isAdmin}
-            helperText=${isAdmin ? 'Name of this specific manufacturing plant' : 'Only Administrator can change factory name'}
-            @input=${(e: Event) => this.editFactoryName = (e.target as HTMLInputElement).value}>
-          </md-outlined-text-field>
+          <h3 class="card-title">Organization Settings</h3>
 
           <md-outlined-text-field 
             label="Company Name" 
             .value=${this.editCompany}
             ?disabled=${!isAdmin}
+            helperText=${isAdmin ? 'Corporate organization name' : 'Managed by Factory Administrator'}
             @input=${(e: Event) => this.editCompany = (e.target as HTMLInputElement).value}>
           </md-outlined-text-field>
 
           ${isAdmin ? html`
             <div class="keychain-box">
+              <div>
+                <strong>Active Factory:</strong> ${this.factoryProfileState?.data?.name || profile?.company || 'Factory'}
+              </div>
               <div>
                 <strong>Factory Keychain ID:</strong>
                 <div class="keychain-key-display">${profile?.key || 'N/A'}</div>
@@ -1051,11 +1039,11 @@ export class ViewSettings extends LitElement {
                   <md-icon slot="icon">content_copy</md-icon> Copy Key
                 </md-outlined-button>
               </div>
-              <span style="font-size:0.76rem; color:#777;">Share this Keychain ID with new members. They will join this factory as Operators.</span>
+              <span style="font-size:0.76rem; color:#777;">Share this Keychain ID with new members. They will join this factory as Operators. To edit the factory name, visit Setup &gt; Factory Topology.</span>
             </div>
 
-            <md-filled-button class="btn-block" @click=${this.saveFactoryAndOrganizationSettings}>
-              Save Factory & Organization
+            <md-filled-button class="btn-block" @click=${this.saveOrganizationSettings}>
+              Save Organization Settings
             </md-filled-button>
 
             <div style="display:flex; gap:8px;">
@@ -1075,7 +1063,10 @@ export class ViewSettings extends LitElement {
             </md-outlined-button>
           ` : html`
             <div class="keychain-box">
-              <div style="display:flex; align-items:center; justify-content:space-between;">
+              <div>
+                <strong>Active Factory:</strong> ${this.factoryProfileState?.data?.name || profile?.company || 'Factory'}
+              </div>
+              <div style="display:flex; align-items:center; justify-content:space-between; margin-top:4px;">
                 <div>
                   <strong>Role:</strong> 
                   <span class="role-badge operator">
